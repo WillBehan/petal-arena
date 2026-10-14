@@ -1,0 +1,566 @@
+{
+  "ladybug": {
+    "name": "Ladybug",
+    "health": 25,
+    "damage": 10,
+    "xp": 3,
+    "radius": 32,
+    "speed": 49,
+    "move": "step",
+    "zones": {
+      "Easy": [
+        25,
+        40
+      ],
+      "Medium": [
+        12,
+        19
+      ],
+      "Hard": [
+        8,
+        12
+      ]
+    },
+    "drops": {
+      "rose": 0.11,
+      "fast": 0.07,
+      "twin": 0.02,
+      "bubble": 0.004,
+      "wing": 0.002
+    }
+  },
+  "massiveLadybug": {
+    "name": "Massive Ladybug",
+    "health": 1000,
+    "damage": 10,
+    "xp": 50,
+    "radius": 180,
+    "speed": 44,
+    "move": "step",
+    "zones": {
+      "Easy": [
+        0,
+        1
+      ]
+    },
+    "spawnChance": 0.01,
+    "drops": {
+      "rose": 1,
+      "bubble": 1,
+      "roseRare": 1,
+      "roseEpic": 1
+    },
+    "globalMax": 1
+  },
+  "bee": {
+    "name": "Bee",
+    "health": 15,
+    "damage": 50,
+    "xp": 3,
+    "radius": 30,
+    "speed": 76,
+    "wobble": true,
+    "zones": {
+      "Easy": [
+        21,
+        35
+      ],
+      "Medium": [
+        12,
+        19
+      ],
+      "Hard": [
+        10,
+        15
+      ]
+    },
+    "drops": {
+      "fast": 0.13,
+      "stinger": 0.08,
+      "twin": 0.04,
+      "honey": 0.01,
+      "bubble": 0.007,
+      "wing": 0.004
+    }
+  },
+  "rock": {
+    "name": "Rock",
+    "health": 12,
+    "damage": 10,
+    "xp": 1,
+    "radius": 20,
+    "speed": 0,
+    "stationary": true,
+    "sizeRange": [
+      26,
+      42
+    ],
+    "healthRange": [
+      8,
+      16
+    ],
+    "zones": {
+      "Easy": [
+        106,
+        143
+      ]
+    },
+    "drops": {
+      "heavy": 0.1,
+      "fast": 0.03,
+      "rock": 0.005
+    }
+  },
+  "boulder": {
+    "name": "Boulder",
+    "health": 60,
+    "damage": 20,
+    "xp": 5,
+    "radius": 72,
+    "speed": 0,
+    "stationary": true,
+    "sizeRange": [
+      65,
+      80
+    ],
+    "healthRange": [
+      50,
+      70
+    ],
+    "zones": {
+      "Easy": [
+        5,
+        7
+      ],
+      "Hard": [
+        90,
+        122
+      ]
+    },
+    "spawnChance": {
+      "Easy": 0.05
+    },
+    "drops": {
+      "heavy": 0.3,
+      "rock": 0.05,
+      "heaviest": 0.005
+    }
+  },
+  "babyAnt": {
+    "name": "Baby Ant",
+    "health": 10,
+    "damage": 10,
+    "xp": 1,
+    "radius": 14.4,
+    "speed": 55,
+    "zones": {
+      "Easy": [
+        19,
+        30
+      ],
+      "Medium": [
+        12,
+        18
+      ],
+      "Hard": [
+        8,
+        12
+      ]
+    },
+    "drops": {
+      "fast": 0.44,
+      "leaf": 0.26,
+      "twin": 0.12,
+      "rice": 0.005,
+      "triplet": 0.0005
+    }
+  },
+  "workerAnt": {
+    "name": "Worker Ant",
+    "health": 25,
+    "damage": 10,
+    "xp": 2,
+    "radius": 20,
+    "speed": 60,
+    "aggro": "onHit",
+    "chaseSpeed": 273,
+    "zones": {
+      "Easy": [
+        13,
+        19
+      ],
+      "Medium": [
+        11,
+        17
+      ],
+      "Hard": [
+        9,
+        14
+      ]
+    },
+    "zoneRange": {
+      "Easy": [
+        0.5,
+        1
+      ]
+    },
+    "drops": {
+      "fast": 0.46,
+      "leaf": 0.28,
+      "twin": 0.13,
+      "corn": 0.006,
+      "triplet": 0.0005
+    },
+    "chaseAccel": 0.7
+  },
+  "centipede": {
+    "name": "Centipede",
+    "health": 50,
+    "damage": 10,
+    "xp": 3,
+    "radius": 31,
+    "speed": 38,
+    "segments": 11,
+    "zones": {
+      "Easy": [
+        7,
+        14
+      ],
+      "Medium": [
+        3,
+        7
+      ],
+      "Hard": [
+        3,
+        6
+      ]
+    },
+    "drops": {
+      "fast": 0.09,
+      "leaf": 0.05,
+      "peas": 0.03,
+      "twin": 0.02,
+      "peasEpic": 0.0005,
+      "triplet": 0.0001
+    }
+  },
+  "cactus": {
+    "name": "Cactus",
+    "health": 35,
+    "damage": 35,
+    "xp": 2,
+    "radius": 41,
+    "speed": 0,
+    "stationary": true,
+    "sizeRange": [
+      32,
+      52
+    ],
+    "healthRange": [
+      28,
+      42
+    ],
+    "zones": {
+      "Medium": [
+        52,
+        73
+      ]
+    },
+    "drops": {
+      "stinger": 0.05,
+      "cactusRare": 0.03,
+      "missile": 0.009,
+      "cactusEpic": 0.001,
+      "cactusLegendary": 5e-05
+    }
+  },
+  "yellowLadybug": {
+    "name": "Yellow Ladybug",
+    "health": 25,
+    "damage": 10,
+    "xp": 5,
+    "radius": 32,
+    "speed": 49,
+    "move": "step",
+    "aggro": "onHit",
+    "chaseSpeed": 273,
+    "zones": {
+      "Medium": [
+        1,
+        2
+      ]
+    },
+    "spawnChance": 0.01,
+    "drops": {
+      "rose": 1,
+      "twin": 0.39,
+      "roseRare": 0.34,
+      "bubble": 0.08,
+      "wing": 0.04,
+      "triplet": 0.002
+    },
+    "chaseAccel": 1.4
+  },
+  "beetle": {
+    "name": "Beetle",
+    "health": 40,
+    "damage": 35,
+    "xp": 5,
+    "radius": 38,
+    "speed": 49,
+    "aggroRange": 450,
+    "chaseSpeed": 278,
+    "zones": {
+      "Medium": [
+        14,
+        21
+      ],
+      "Hard": [
+        16,
+        24
+      ]
+    },
+    "zoneRange": {
+      "Medium": [
+        0.5,
+        1
+      ]
+    },
+    "drops": {
+      "iris": 0.09,
+      "salt": 0.06,
+      "wing": 0.006,
+      "triplet": 0.0003
+    },
+    "chaseAccel": 1.4
+  },
+  "massiveBeetle": {
+    "name": "Massive Beetle",
+    "health": 600,
+    "damage": 35,
+    "xp": 50,
+    "radius": 95,
+    "speed": 38,
+    "aggroRange": 500,
+    "chaseSpeed": 273,
+    "zones": {
+      "Medium": [
+        1,
+        3
+      ],
+      "Hard": [
+        1,
+        3
+      ],
+      "?": [
+        1,
+        3
+      ]
+    },
+    "zoneRange": {
+      "Medium": [
+        0.5,
+        1
+      ]
+    },
+    "spawnChance": 0.01,
+    "drops": {
+      "iris": 1,
+      "wing": 0.31,
+      "eggLegendary": 0.02
+    },
+    "estimated": true,
+    "chaseAccel": 1.4
+  },
+  "evilCentipede": {
+    "name": "Evil Centipede",
+    "health": 50,
+    "damage": 10,
+    "xp": 5,
+    "radius": 31,
+    "speed": 38,
+    "segments": 11,
+    "aggroRange": 320,
+    "chaseSpeed": 285,
+    "zones": {
+      "Medium": [
+        1,
+        5
+      ],
+      "Hard": [
+        1,
+        5
+      ],
+      "?": [
+        1,
+        5
+      ]
+    },
+    "zoneRange": {
+      "Medium": [
+        0.5,
+        1
+      ]
+    },
+    "drops": {
+      "iris": 0.82,
+      "peasEpic": 0.01,
+      "triplet": 0.003,
+      "peasLegendary": 0.001
+    },
+    "spawnChance": 0.01,
+    "chaseAccel": 0.7
+  },
+  "antHole": {
+    "name": "Ant Hole",
+    "health": 300,
+    "damage": 15,
+    "xp": 20,
+    "radius": 55,
+    "speed": 0,
+    "stationary": true,
+    "zones": {
+      "Medium": [
+        1,
+        2
+      ],
+      "Hard": [
+        2,
+        3
+      ]
+    },
+    "zoneRange": {
+      "Medium": [
+        0.5,
+        1
+      ]
+    },
+    "spawnChance": 0.03,
+    "releases": {
+      "babyAnt": 5,
+      "workerAnt": 8,
+      "soldierAnt": 25
+    },
+    "queenAt": 100,
+    "drops": {
+      "iris": 1,
+      "wing": 0.31,
+      "egg": 0.06
+    }
+  },
+  "soldierAnt": {
+    "name": "Soldier Ant",
+    "health": 40,
+    "damage": 10,
+    "xp": 5,
+    "radius": 20,
+    "speed": 65,
+    "aggroRange": 250,
+    "chaseSpeed": 285,
+    "zones": {
+      "Hard": [
+        14,
+        20
+      ]
+    },
+    "from": "Ant Hole (also wild in Hard)",
+    "drops": {
+      "iris": 0.12,
+      "twin": 0.08,
+      "faster": 0.03,
+      "wing": 0.008,
+      "triplet": 0.0004
+    },
+    "chaseAccel": 0.7
+  },
+  "queenAnt": {
+    "name": "Queen Ant",
+    "health": 200,
+    "damage": 10,
+    "xp": 20,
+    "radius": 34,
+    "speed": 49,
+    "aggroRange": 350,
+    "chaseSpeed": 275,
+    "leash": 700,
+    "zones": {},
+    "from": "Ant Hole",
+    "drops": {
+      "twin": 1,
+      "faster": 1,
+      "wing": 0.31,
+      "egg": 0.06,
+      "triplet": 0.01,
+      "stingerLegendary": 0.006
+    },
+    "chaseAccel": 0.7
+  },
+  "spider": {
+    "name": "Spider",
+    "health": 20,
+    "damage": 25,
+    "xp": 5,
+    "radius": 24,
+    "speed": 76,
+    "aggroRange": 450,
+    "chaseSpeed": 315,
+    "webImmune": true,
+    "zones": {
+      "Hard": [
+        14,
+        20
+      ]
+    },
+    "drops": {
+      "stinger": 0.18,
+      "iris": 0.12,
+      "web": 0.09,
+      "faster": 0.03,
+      "webLegendary": 0.0002
+    },
+    "instantChase": true
+  },
+  "hornet": {
+    "name": "Hornet",
+    "health": 40,
+    "damage": 50,
+    "xp": 10,
+    "radius": 40,
+    "speed": 76,
+    "wobble": true,
+    "aggroRange": 450,
+    "chaseSpeed": 270,
+    "zones": {
+      "Hard": [
+        10,
+        15
+      ]
+    },
+    "zoneRange": {
+      "Hard": [
+        0.5,
+        1
+      ]
+    },
+    "shooter": {
+      "every": 2,
+      "damage": 10,
+      "health": 10,
+      "speed": 620,
+      "life": 1.2,
+      "keepAway": 260,
+      "predictChance": 1,
+      "aimTolerance": 0.08,
+      "turnRate": 7
+    },
+    "drops": {
+      "dandelion": 0.14,
+      "missile": 0.09,
+      "honey": 0.09,
+      "bubble": 0.05,
+      "wing": 0.03,
+      "antennae": 0.0003
+    },
+    "chaseAccel": 1.4
+  }
+}

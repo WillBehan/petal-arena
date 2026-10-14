@@ -1,0 +1,103 @@
+{
+  "port": 3000,
+  "tickRate": 25,
+  "map": {
+    "height": 4500,
+    "zones": [
+      {
+        "name": "Easy",
+        "width": 13500,
+        "color": "#2fa86a",
+        "maxLevel": 15
+      },
+      {
+        "name": "Medium",
+        "width": 13500,
+        "color": "#dbcd87",
+        "maxLevel": 30
+      },
+      {
+        "name": "Hard",
+        "width": 13500,
+        "color": "#b5544c",
+        "maxLevel": 45
+      },
+      {
+        "name": "?",
+        "width": 4050,
+        "color": "#7c7c7c",
+        "maxLevel": null
+      }
+    ]
+  },
+  "flower": {
+    "radius": 25,
+    "speed": 300,
+    "acceleration": 8,
+    "baseHealth": 100,
+    "maxHealth": 150,
+    "levelCap": 45,
+    "bodyDamage": 25,
+    "pvpBodyDamageStartLevel": 5,
+    "pvpBodyDamageFullLevel": 10,
+    "startingPetals": [
+      "basic",
+      "basic",
+      "basic",
+      "basic",
+      "basic"
+    ],
+    "extraSlotLevels": [
+      15,
+      30,
+      45
+    ],
+    "bumpDamage": 5,
+    "knockback": 20,
+    "benchSlots": 8,
+    "overlevelGrace": 45
+  },
+  "petals": {
+    "orbitRadius": 60,
+    "attackRadius": 110,
+    "defendRadius": 35,
+    "spinSpeed": 2.73,
+    "radiusSpeed": 10,
+    "hitCooldown": 0.25
+  },
+  "leveling": {
+    "xpMultiplier": 10,
+    "base": 10,
+    "exponent": 1.4,
+    "killXpBase": 10,
+    "killXpPerLevel": 5
+  },
+  "drops": {
+    "pickupRadius": 30,
+    "deathDropCount": 3,
+    "deathVanishChance": 0.2,
+    "despawn": {
+      "common": 30,
+      "unusual": 30,
+      "rare": 40,
+      "epic": 50,
+      "legendary": 60,
+      "unique": 60
+    }
+  },
+  "mobs": {
+    "respawnInterval": 1,
+    "minSpawnDistance": 600,
+    "knockback": 6,
+    "refillChance": 0.25,
+    "deaggroFactor": 1.3,
+    "onHitGiveUp": 700
+  },
+  "view": {
+    "halfWidth": 1485,
+    "halfHeight": 935
+  },
+  "client": {
+    "zoom": 0.773
+  }
+}
