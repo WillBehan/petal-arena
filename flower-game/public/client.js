@@ -31,20 +31,68 @@ function join() {
   const name = $('name').value;
   document.activeElement.blur();
   ws = new WebSocket(`ws://${location.host}`);
-  ws.onopen = () => ws.send(JSON.stringify({ t: 'join', name }));
+  ws.onopen = () => ws.send(JSON.stringify({ t: 'join', name, start: takeCustomStart() }));
   ws.onmessage = e => {
     const m = JSON.parse(e.data);
-    if (m.t === 'init') { myId = m.id; MAP = m.map; PETALS = m.petals; MOBDEFS = m.mobs; FR = m.flowerRadius; SPIN = m.spin; ZOOM = m.zoom || 1; $('title').classList.add('hidden'); }
+    if (m.t === 'init') { myId = m.id; MAP = m.map; PETALS = m.petals; MOBDEFS = m.mobs; FR = m.flowerRadius; SPIN = m.spin; ZOOM = m.zoom || 1; irisOpen(); }
     else if (m.t === 's') onState(m);
-    else if (m.t === 'dead') death = { by: m.by, t: now() };
-    else if (m.t === 'pick') inv.pops[m.slot] = now() + 0.18;   // bench slot pops in as the drop arrives
+    else if (m.t === 'dead') death = { by: m.by, t: now(), level: m.level, keep: m.keep || [], slots: m.slots || 5 };
+    else if (m.t === 'pick' && m.row !== 'e') inv.pops[m.slot] = now() + 0.18;   // bench slot pops in as the drop arrives
   };
-  ws.onclose = () => { $('title').classList.remove('hidden'); $('title').querySelector('h1').textContent = 'Disconnected'; };
+  ws.onclose = () => {
+    homeAfterDeath = null; death = null; myId = null;              // so Play joins again instead of waiting for a respawn
+    showTitle(); $('title').querySelector('h1').textContent = 'Disconnected'; updateSpawnInfo();
+  };
 }
-$('play').onclick = join;
-$('name').onkeydown = e => { if (e.key === 'Enter') join(); };
+// Play: first time joins; after a death it brings you back with what you kept
+const play = () => {
+  if (homeAfterDeath) { send({ t: 'respawn', name: $('name').value, start: takeCustomStart() }); homeAfterDeath = null; irisOpen(); }
+  else join();
+};
+$('play').onclick = play;
+$('name').onkeydown = e => { if (e.key === 'Enter') play(); };
 const send = m => { if (ws && ws.readyState === 1) ws.send(JSON.stringify(m)); };
-function respawn() { if (death && now() - death.t > 0.6) { send({ t: 'respawn' }); death = null; } }
+// Death screen -> Enter/click goes back to the home screen, which shows what you'll respawn with
+let homeAfterDeath = null;
+function respawn() {
+  if (!death || now() - death.t <= 0.6) return;
+  homeAfterDeath = death; death = null;
+  showTitle(); $('title').querySelector('h1').textContent = 'Petal Arena';
+  updateSpawnInfo();
+  $('name').focus();
+}
+// Under the Play button: what you'll spawn with - a saved custom start, or what you kept
+// after dying. Only real petals are shown (no empty boxes).
+function updateSpawnInfo() {
+  const el = $('spawnInfo'); el.innerHTML = '';
+  let level, load, bench;
+  if (startCfg.armed) {
+    level = startCfg.level; const n = slotsFor(level);
+    load = startCfg.petals.slice(0, n).filter(Boolean); bench = startCfg.bench.filter(Boolean);
+  } else if (homeAfterDeath && homeAfterDeath.level) {
+    level = homeAfterDeath.level; const n = homeAfterDeath.slots;
+    load = homeAfterDeath.keep.slice(0, n); bench = homeAfterDeath.keep.slice(n);
+  } else { el.classList.add('hidden'); return; }
+  el.classList.remove('hidden');
+  const h = document.createElement('div'); h.textContent = `You will ${homeAfterDeath ? 're' : ''}spawn at level ${level} with:`; el.appendChild(h);
+  const row = (types, size) => { if (!types.length) return; const r = document.createElement('div'); r.className = 'prow rrow';
+    types.forEach(t => r.appendChild(iconCanvas(size, s => drawSlotBox(0, 0, s, t)))); el.appendChild(r); };
+  row(load, 52); row(bench, 40);
+  if (!load.length && !bench.length) { const n = document.createElement('div'); n.className = 'mnote'; n.textContent = 'no petals'; el.appendChild(n); }
+}
+// Title screen in / out. Leaving it, the game opens up through a growing circle.
+function showTitle() { const t = $('title'); t.style.webkitMaskImage = t.style.maskImage = ''; t.classList.remove('hidden'); }
+function irisOpen() {
+  const t = $('title'), t0 = performance.now(), dur = 650, far = Math.hypot(innerWidth, innerHeight) / 2 + 40;
+  $('startModal').classList.add('hidden');
+  const step = ts => {
+    const k = Math.min(1, (ts - t0) / dur), r = far * (1 - Math.pow(1 - k, 3));
+    const m = `radial-gradient(circle at 50% 50%, transparent ${r}px, #000 ${r + 2}px)`;
+    t.style.webkitMaskImage = t.style.maskImage = m;
+    if (k < 1) requestAnimationFrame(step); else { t.classList.add('hidden'); t.style.webkitMaskImage = t.style.maskImage = ''; }
+  };
+  requestAnimationFrame(step);
+}
 
 // ---------- Incoming state: detect hits, deaths, pickups ----------
 function onState(m) {
@@ -52,18 +100,18 @@ function onState(m) {
   for (const p of m.players) {
     let v = view[p.id];
     if (!v) v = view[p.id] = { x: p.x, y: p.y, ang: p.pa, pr: p.pr, hp: p.hp, lastHp: p.hp, flash: 0, rf: {} };
-    if (p.hp < v.lastHp - 0.05 && !p.d) v.flash = FLASH;
+    if (p.f && !p.d) v.flash = FLASH;
     if (p.d && !v.deadT) v.deadT = t;
     if (!p.d) v.deadT = 0;
     v.lastHp = p.hp;
   }
   const seen = new Set();
   for (const a of m.mobs) {
-    const [id, type, x, y, ang, hp, r, head] = a;
+    const [id, type, x, y, ang, hp, r, head, fl] = a;
     seen.add(id);
     let v = mview[id];
     if (!v) v = mview[id] = { id, type, x, y, ang, hp, r, head, flash: 0, born: t };
-    if (hp < v.thp - 0.01) v.flash = FLASH;
+    if (fl) v.flash = FLASH;
     Object.assign(v, { tx: x, ty: y, tang: ang, thp: hp, r, head });
   }
   for (const id in mview) if (!seen.has(+id)) { const v = mview[id]; v.flash = FLASH; ghosts.push({ kind: 'mob', v, t0: t }); delete mview[id]; }
@@ -96,10 +144,12 @@ function onState(m) {
 }
 
 // ---------- Inventory ----------
+// Slot colours as in the original (fill, then the border = fill darkened to 80%)
 const RARITY = {
-  common: ['#8fe07f', '#6cbc5d'], unusual: ['#f2dd63', '#c8b247'], rare: ['#5d92ee', '#4473c4'],
-  epic: ['#b263ee', '#8c48c4'], legendary: ['#ea5d5d', '#bf4646'], unique: ['#f07cd6', '#c35fad'],
+  common: ['#7eef6d', '#65bf57'], unusual: ['#ffe65d', '#ccb84a'], rare: ['#5d4de2', '#4a3eb5'],
+  epic: ['#861fde', '#6b19b2'], legendary: ['#de1f1f', '#b21919'], unique: ['#ff2b75', '#cc225e'],
 };
+const SLOT_ALPHA = 0.85;
 const inv = {
   open: false, sel: -1, press: null, drag: null, L: null, anims: [], pops: {},
   animTo(row, i) { return this.anims.some(a => a.toRow === row && a.toI === i && now() < a.t0 + a.dur); },
@@ -107,15 +157,16 @@ const inv = {
 const inRect = (x, y, r) => x >= r.x && x <= r.x + (r.w ?? r.s) && y >= r.y && y <= r.y + (r.h ?? r.s);
 function invLayout(W, H) {
   const eqN = state.me.slots.length, bN = state.me.bench.length;
-  const es = 56, eg = 14, bs = 44, bg = 12, hintH = 30;
-  const by = H - hintH - 16 - bs, ey = by - 14 - es;
+  // Sizes follow the original: everything scales with the window height (1080p numbers)
+  const u = uiScale(H), es = 70 * u, eg = 20 * u, bs = 50 * u, bg = 15 * u, hintH = 34 * u;
+  const by = H - 94 * u, ey = H - 180 * u;
   const eqW = eqN * es + (eqN - 1) * eg, bW = (bN + 1) * bs + bN * bg, maxW = Math.max(eqW, bW);
   const eq = [], bench = [];
   for (let i = 0; i < eqN; i++) eq.push({ row: 'e', i, x: W / 2 - eqW / 2 + i * (es + eg), y: ey, s: es });
   for (let i = 0; i < bN; i++) bench.push({ row: 'b', i, x: W / 2 - bW / 2 + i * (bs + bg), y: by, s: bs });
   return {
     eq, bench, trash: { row: 't', x: W / 2 - bW / 2 + bN * (bs + bg), y: by, s: bs },
-    hint: { x: W / 2 - 170, y: H - hintH, w: 340, h: hintH },
+    hint: { x: W / 2 - 148 * u, y: H - hintH, w: 296 * u, h: hintH },
     panel: { x: W / 2 - maxW / 2 - 40, y: ey - 24, w: maxW + 80, h: H - ey + 24 },
   };
 }
@@ -248,8 +299,10 @@ setInterval(() => {
     a = Math.atan2(dy, dx); m = Math.min(1, Math.hypot(dx, dy) / 150);
     if (m < 0.08 || inv.open) m = 0;
   }
+  const z = zoomCur || ZOOM;                         // how much world your screen shows (used for the curse)
   const msg = JSON.stringify({ t: 'in', a: +a.toFixed(3), m: +m.toFixed(2),
-    at: input.mouseL || k.Space ? 1 : 0, df: input.mouseR || k.ShiftLeft || k.ShiftRight ? 1 : 0 });
+    at: input.mouseL || k.Space ? 1 : 0, df: input.mouseR || k.ShiftLeft || k.ShiftRight ? 1 : 0,
+    vw: Math.round(innerWidth / z / 2 / 25) * 25, vh: Math.round(innerHeight / z / 2 / 25) * 25 });
   if (msg !== lastSent) { ws.send(msg); lastSent = msg; }
 }, 1000 / 30);
 
@@ -263,6 +316,7 @@ function rgb(h) {
   return (rgbCache[h] = [(n >> 16) & 255, (n >> 8) & 255, n & 255]);
 }
 // Blend a color toward hit-red by amount f (0..1) — used for damage flashes
+function shade(h, f) { const [r, g, b] = rgb(h); return `rgb(${r * f | 0},${g * f | 0},${b * f | 0})`; }
 function col(h, f) {
   if (!f) return h;
   const [r, g, b] = rgb(h);
@@ -272,6 +326,14 @@ function seeded(id) { let s = id * 9301 + 49297; return () => ((s = (s * 9301 + 
 function roundRect(x, y, w, h, r) {
   ctx.beginPath(); ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r);
   ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath();
+}
+const uiScale = H => Math.max(0.6, Math.min(1.3, H / 1080));
+// Ubuntu Bold, white with a dark outline - the original's lettering (petal slots, level bar)
+function labelU(text, x, y, size, align = 'center', maxW = 0) {
+  ctx.font = `700 ${size}px Ubuntu, system-ui, sans-serif`;
+  if (maxW) { const w = ctx.measureText(text).width; if (w > maxW) { size *= maxW / w; ctx.font = `700 ${size}px Ubuntu, system-ui, sans-serif`; } }
+  ctx.textAlign = align; ctx.lineJoin = 'round'; ctx.lineWidth = size * 0.2; ctx.strokeStyle = '#000'; ctx.fillStyle = '#fff';
+  ctx.strokeText(text, x, y); ctx.fillText(text, x, y);
 }
 function label(text, x, y, size = 16, align = 'left', color = '#fff') {
   ctx.font = `bold ${size}px system-ui, -apple-system, sans-serif`; ctx.textAlign = align; ctx.lineWidth = Math.max(3, size / 4);
@@ -297,6 +359,8 @@ function drawPetal(x, y, type, scale = 1, angle = 0, alpha = 1, flash = 0, singl
     ctx.moveTo(r * 1.3, 0); ctx.quadraticCurveTo(0, -r * 1.1, -r * 1.1, 0); ctx.quadraticCurveTo(0, r * 1.1, r * 1.3, 0);
     ctx.fill(); ctx.stroke();
     ctx.beginPath(); ctx.moveTo(-r * 1.5, 0); ctx.lineTo(r * 0.9, 0); ctx.lineWidth = 2 * scale; ctx.stroke();
+  } else if (d.shape === 'square') {                     // Square petal
+    const h = r * 0.85; ctx.rect(-h, -h, h * 2, h * 2); ctx.fill(); ctx.stroke();
   } else if (d.shape === 'triangle') {
     ctx.moveTo(r * 1.3, 0); ctx.lineTo(-r * 0.8, -r * 0.95); ctx.lineTo(-r * 0.8, r * 0.95); ctx.closePath(); ctx.fill(); ctx.stroke();
   } else if (d.shape === 'rock') {
@@ -333,12 +397,19 @@ function drawPetal(x, y, type, scale = 1, angle = 0, alpha = 1, flash = 0, singl
     for (let i = 0; i < 6; i++) { const a = i / 6 * TAU; ctx.moveTo(0, 0); ctx.lineTo(Math.cos(a) * r * 0.85, Math.sin(a) * r * 0.85); }
     ctx.moveTo(r * 0.5, 0); ctx.arc(0, 0, r * 0.5, 0, TAU); ctx.stroke();
   } else if (d.shape === 'dandelion') {                  // Dandelion: fluffy seed head on a stem
-    ctx.strokeStyle = col('#7a9a5a', flash); ctx.lineWidth = 2 * scale; ctx.beginPath(); ctx.moveTo(-r * 0.4, 0); ctx.lineTo(-r * 1.4, 0); ctx.stroke();
+    ctx.strokeStyle = col('#7a9a5a', flash); ctx.lineWidth = 4 * scale; ctx.beginPath(); ctx.moveTo(-r * 0.4, 0); ctx.lineTo(-r * 1.4, 0); ctx.stroke();
     ctx.fillStyle = col(d.color, flash); ctx.strokeStyle = col(d.outline, flash); ctx.lineWidth = 2 * scale;
     ctx.beginPath(); ctx.arc(0, 0, r * 0.85, 0, TAU); ctx.fill(); ctx.stroke();
     ctx.strokeStyle = col('#d8d8d8', flash); ctx.lineWidth = 1 * scale; ctx.beginPath();
     for (let i = 0; i < 10; i++) { const a = i / 10 * TAU; ctx.moveTo(0, 0); ctx.lineTo(Math.cos(a) * r * 0.8, Math.sin(a) * r * 0.8); }
     ctx.stroke();
+  } else if (d.shape === 'yinyang') {                    // Yin Yang: black and white swirl
+    ctx.fillStyle = col('#ffffff', flash); ctx.arc(0, 0, r, 0, TAU); ctx.fill();
+    ctx.fillStyle = col('#2a2a2a', flash); ctx.beginPath(); ctx.arc(0, 0, r, -Math.PI / 2, Math.PI / 2);
+    ctx.arc(0, r / 2, r / 2, Math.PI / 2, -Math.PI / 2, true); ctx.arc(0, -r / 2, r / 2, Math.PI / 2, -Math.PI / 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(0, -r / 2, r * 0.15, 0, TAU); ctx.fill();
+    ctx.fillStyle = col('#ffffff', flash); ctx.beginPath(); ctx.arc(0, r / 2, r * 0.15, 0, TAU); ctx.fill();
+    ctx.strokeStyle = col('#2a2a2a', flash); ctx.lineWidth = 1.5 * scale; ctx.beginPath(); ctx.arc(0, 0, r, 0, TAU); ctx.stroke();
   } else if (d.shape === 'antennae') {                   // Antennae (icon only; worn on the flower)
     ctx.strokeStyle = col(d.color, flash); ctx.lineWidth = 2.2 * scale; ctx.lineCap = 'round'; ctx.beginPath();
     for (const sx of [-1, 1]) { ctx.moveTo(sx * r * 0.25, r * 0.8); ctx.quadraticCurveTo(sx * r * 0.3, -r * 0.2, sx * r * 0.9, -r * 0.8); }
@@ -352,12 +423,21 @@ function drawPetal(x, y, type, scale = 1, angle = 0, alpha = 1, flash = 0, singl
     for (const k of [-0.5, 0, 0.5]) { ctx.moveTo(k * r * 1.4, -r * 0.6); ctx.lineTo(k * r * 1.4, r * 0.6); }
     ctx.stroke();
   } else { ctx.arc(0, 0, r, 0, TAU); ctx.fill(); ctx.stroke(); }
+  if (d.sparkle) {                                       // Unique Basic: little sparkles drifting off it
+    const t = performance.now() / 1000;
+    ctx.fillStyle = d.sparkle;
+    for (let i = 0; i < 5; i++) {
+      const k = (t * 0.8 + i / 5) % 1, a = i * 2.4 + Math.floor(t * 0.8 + i / 5) * 1.7;
+      ctx.globalAlpha = alpha * (1 - k);
+      ctx.beginPath(); ctx.arc(Math.cos(a) * r * (1 + k * 1.2), Math.sin(a) * r * (1 + k * 1.2), r * 0.18 * (1 - k * 0.5), 0, TAU); ctx.fill();
+    }
+  }
   ctx.restore();
 }
 
 // ---------- Drawing: our flower ----------
 function drawDart(x, y, a) {
-  ctx.save(); ctx.translate(x, y); ctx.rotate(a); ctx.fillStyle = '#2a2a2a'; ctx.strokeStyle = '#111'; ctx.lineWidth = 2;
+  ctx.save(); ctx.translate(x, y); ctx.rotate(a); ctx.scale(1.3, 1.3); ctx.fillStyle = "#2a2a2a"; ctx.strokeStyle = '#111'; ctx.lineWidth = 2;
   ctx.beginPath(); ctx.moveTo(13, 0); ctx.lineTo(-8, -6); ctx.lineTo(-4, 0); ctx.lineTo(-8, 6); ctx.closePath(); ctx.fill(); ctx.stroke(); ctx.restore();
 }
 function drawWebPatch(x, y, r) {
@@ -378,7 +458,7 @@ function drawFlower(p, x, y, isMe, v) {
     ctx.stroke(); ctx.fillStyle = '#2b2b2b';
     for (const sx of [-1, 1]) { ctx.beginPath(); ctx.arc(sx * r * 0.95, -r * 1.75, 3.5, 0, TAU); ctx.fill(); }
   }
-  ctx.fillStyle = col('#ffe36b', f); ctx.strokeStyle = col('#d8b83f', f); ctx.lineWidth = 4;
+  ctx.fillStyle = col(p.po ? '#b06ad8' : '#ffe36b', f); ctx.strokeStyle = col(p.po ? '#8a4fb0' : '#d8b83f', f); ctx.lineWidth = 4;   // purple while poisoned
   ctx.beginPath(); ctx.arc(0, 0, r, 0, TAU); ctx.fill(); ctx.stroke();
   ctx.strokeStyle = '#2a2418'; ctx.fillStyle = '#2a2418'; ctx.lineCap = 'round';
   if (p.d) {
@@ -416,13 +496,13 @@ function hpBar(x, y, w, frac) {
 function drawMob(v, x, y, alpha = 1, scale = 1) {
   const r = v.r * scale, f = v.flash, t = now();
   ctx.save(); ctx.globalAlpha = alpha; ctx.translate(x, y); ctx.rotate(v.ang); ctx.lineJoin = 'round'; ctx.lineCap = 'round';
-  if (v.type === 'ladybug' || v.type === 'massiveLadybug' || v.type === 'yellowLadybug') {
-    const yel = v.type === 'yellowLadybug';
+  if (v.type === 'ladybug' || v.type === 'massiveLadybug' || v.type === 'yellowLadybug' || v.type === 'darkLadybug') {
+    const yel = v.type === 'yellowLadybug', dark = v.type === 'darkLadybug';
     ctx.fillStyle = col('#2b2b2b', f); ctx.beginPath(); ctx.arc(r * 0.72, 0, r * 0.5, 0, TAU); ctx.fill();
-    ctx.fillStyle = col(yel ? '#f2d43c' : '#e8483e', f); ctx.strokeStyle = col(yel ? '#c4a82a' : '#b0332b', f); ctx.lineWidth = Math.max(3, r * 0.12);
+    ctx.fillStyle = col(yel ? '#f2d43c' : dark ? '#962921' : '#e8483e', f); ctx.strokeStyle = col(yel ? '#c4a82a' : dark ? '#6f1d17' : '#b0332b', f); ctx.lineWidth = Math.max(3, r * 0.12);
     ctx.beginPath(); ctx.arc(0, 0, r, 0, TAU); ctx.fill(); ctx.stroke();
     ctx.beginPath(); ctx.moveTo(r, 0); ctx.lineTo(-r * 0.6, 0); ctx.stroke();
-    ctx.fillStyle = col('#2b2b2b', f);
+    ctx.fillStyle = col(dark ? '#e8483e' : '#2b2b2b', f);
     for (const [sx, sy, sr] of [[0.25, -0.45, 0.2], [-0.35, -0.5, 0.17], [0.3, 0.48, 0.18], [-0.4, 0.45, 0.2], [-0.7, 0, 0.13]]) {
       ctx.beginPath(); ctx.arc(sx * r, sy * r, sr * r, 0, TAU); ctx.fill();
     }
@@ -464,6 +544,9 @@ function drawMob(v, x, y, alpha = 1, scale = 1) {
       ctx.strokeStyle = '#2b2b2b'; ctx.lineWidth = Math.max(2, r * 0.08);
       for (const s of [-1, 1]) { ctx.beginPath(); ctx.moveTo(r * 0.8, s * r * 0.3); ctx.quadraticCurveTo(r * 1.3, s * r * 0.35, r * 1.5, s * r * 0.8); ctx.stroke(); }
     }
+  } else if (v.type === 'square') {                     // Square: a plain yellow square that slowly spins
+    ctx.fillStyle = col('#ffe869', f); ctx.strokeStyle = col('#bfae4e', f); ctx.lineWidth = Math.max(3, r * 0.16);
+    const h = r * 0.8; ctx.beginPath(); ctx.rect(-h, -h, h * 2, h * 2); ctx.fill(); ctx.stroke();
   } else if (v.type === 'cactus') {
     // Cactus: round green body ringed with spikes
     const n = 12 + (v.id % 4);
@@ -544,17 +627,20 @@ function drawMob(v, x, y, alpha = 1, scale = 1) {
 function drawPetalIcon(type, cx, cy, scale) {
   const n = (PETALS[type] || {}).count || 1;
   if (n === 1) return drawPetal(cx, cy, type, scale, -0.5);
+  if (PETALS[type].cluster) {                                  // triangle cluster, like in the ring
+    const cr = (PETALS[type].radius || 8) * scale * 1.15;
+    for (let i = 0; i < n; i++) { const ca = -Math.PI / 2 + i * TAU / n; drawPetal(cx + Math.cos(ca) * cr, cy + Math.sin(ca) * cr, type, scale, -0.5); }
+    return;
+  }
   const gap = ((PETALS[type].radius || 8) * scale) * 2.3;
   for (let i = 0; i < n; i++) drawPetal(cx + (i - (n - 1) / 2) * gap, cy, type, scale, -0.5);
 }
 function drawDropBox(x, y, type, s, alpha = 1) {
   const d = PETALS[type] || {}, [fill, edge] = RARITY[d.rarity] || RARITY.common;
-  ctx.save(); ctx.globalAlpha *= alpha; ctx.translate(x, y);
-  const b = Math.max(1.5, s * 0.075);               // border scales with the box size
-  ctx.fillStyle = edge; roundRect(-s / 2, -s / 2, s, s, Math.max(2, s * 0.09)); ctx.fill();
-  ctx.fillStyle = fill; roundRect(-s / 2 + b, -s / 2 + b, s - 2 * b, s - 2 * b, Math.max(1, s * 0.05)); ctx.fill();
-  drawPetalIcon(type, 0, -s * 0.1, s / 56 * 0.85);
-  label(d.name || type, 0, s * 0.34, Math.round(s * 0.24), 'center');
+  ctx.save(); ctx.globalAlpha *= alpha; ctx.translate(x, y);      // same look as the petal slots
+  slotFrame(s, fill, edge);
+  drawPetalIcon(type, 0, -s * 0.09, s / 56 * 0.8);
+  labelU(d.name || type, 0, s * 0.3, s * 0.21, 'center', s * 0.86);
   ctx.restore();
 }
 
@@ -574,25 +660,33 @@ function drawBackground(W, H) {
 }
 
 // ---------- HUD ----------
+// Leaderboard points: plain up to 9999, then 10.0K, 22.4K, 409.9K, 1.2M ...
+const fmtScore = n => n < 10000 ? String(n) : n < 1e6 ? (Math.floor(n / 100) / 10).toFixed(1) + 'K' : (Math.floor(n / 1e5) / 10).toFixed(1) + 'M';
 function drawHUD(W, H, me, self) {
   if (self) {
-    label(self.n, 120, H - 128, 22, 'center');
-    const w = 210, frac = Math.min(1, me.xp / me.next);
-    ctx.fillStyle = 'rgba(0,0,0,0.55)'; roundRect(15, H - 112, w, 24, 12); ctx.fill();
-    if (frac > 0.02) { ctx.fillStyle = '#f2df5e'; roundRect(18, H - 109, (w - 6) * frac, 18, 9); ctx.fill(); }
-    label(`Lvl ${self.l} Flower`, 15 + w / 2, H - 94, 14, 'center');
+    // Level bar like the original: a dark pill tucked against the left edge with a
+    // yellow fill that starts as a round blob and stretches as you gain XP
+    const u = uiScale(H), x0 = -6 * u, x1 = 320 * u, y0 = H - 130 * u, bh = 40 * u, cx = (x0 + x1) / 2, ins = 3 * u;
+    const frac = Math.min(1, me.xp / me.next), ih = bh - 2 * ins, iw = x1 - x0 - 2 * ins;
+    ctx.save(); ctx.globalAlpha = 0.85;
+    ctx.fillStyle = '#333333'; roundRect(x0, y0, x1 - x0, bh, bh / 2); ctx.fill();
+    ctx.fillStyle = '#f4fb62'; roundRect(x0 + ins, y0 + ins, ih + (iw - ih) * frac, ih, ih / 2); ctx.fill();
+    ctx.restore();
+    labelU(self.n, cx, y0 - 12 * u, 24 * u);
+    labelU(`Lvl ${self.l} Flower`, cx, y0 + bh / 2 + 6 * u, 17 * u);
     const nextSlot = [15, 30, 45].find(l => l > self.l);
-    if (nextSlot) label(`Extra petal slot at level ${nextSlot}`, 15 + w / 2, H - 70, 12, 'center', '#eef6ef');
+    if (nextSlot) labelU(`Extra petal slot at level ${nextSlot}`, cx, y0 + bh + 18 * u, 14 * u);
   }
-  const sorted = [...state.players].sort((a, b) => b.s - a.s), top = sorted.slice(0, 10), lw = 220, lx = W - lw - 16;
+  const sorted = state.players.filter(p => !p.d).sort((a, b) => b.s - a.s),   // dead flowers leave the leaderboard
+        top = sorted.slice(0, 10), lw = 220, lx = W - lw - 16;
   ctx.fillStyle = 'rgba(0,0,0,0.35)'; roundRect(lx, 16, lw, 40 + top.length * 22, 10); ctx.fill();
   ctx.fillStyle = 'rgba(111,209,143,0.9)'; roundRect(lx, 16, lw, 30, 10); ctx.fill();
-  label(`${state.players.length} Flower${state.players.length === 1 ? '' : 's'}`, lx + lw / 2, 37, 15, 'center');
+  label(`${sorted.length} Flower${sorted.length === 1 ? '' : 's'}`, lx + lw / 2, 37, 15, 'center');
   top.forEach((p, i) => {
     const c = p.id === myId ? '#f6d55c' : '#fff';
-    label(`${i + 1}. ${p.n}`, lx + 12, 68 + i * 22, 14, 'left', c); label(`${p.s}`, lx + lw - 12, 68 + i * 22, 14, 'right', c);
+    label(`${i + 1}. ${p.n}`, lx + 12, 68 + i * 22, 14, 'left', c); label(fmtScore(p.s), lx + lw - 12, 68 + i * 22, 14, 'right', c);
   });
-  if (self && !top.includes(self)) label(`${sorted.indexOf(self) + 1}. ${self.n} — ${self.s}`, lx + 12, 68 + top.length * 22 + 6, 14, 'left', '#f6d55c');
+  if (self && !self.d && !top.includes(self)) label(`${sorted.indexOf(self) + 1}. ${self.n} — ${fmtScore(self.s)}`, lx + 12, 68 + top.length * 22 + 6, 14, 'left', '#f6d55c');
 
   const mw = 220, mh = Math.max(26, mw * MAP.h / MAP.w), mmx = W - mw - 16, mmy = H - mh - 16;
   let zx = mmx;
@@ -607,25 +701,33 @@ function drawHUD(W, H, me, self) {
   drawInventory(W, H, me);
 }
 
+// One petal slot, drawn like the original: see-through square, thick border with
+// slightly rounded outer corners, name in Ubuntu Bold. While recharging the inside
+// goes dark and a bright wedge spins round and grows until it fills the slot.
+function slotFrame(s, fill, edge, inner) {
+  const b = s * 0.08;
+  ctx.fillStyle = inner || fill; ctx.fillRect(-s / 2 + b, -s / 2 + b, s - 2 * b, s - 2 * b);
+  ctx.strokeStyle = edge; ctx.lineWidth = b; ctx.lineJoin = 'round';
+  ctx.strokeRect(-s / 2 + b / 2, -s / 2 + b / 2, s - b, s - b);
+}
 function drawSlotBox(x, y, s, type, ready = 1, bob = 0, pop = 1) {
   if (!type || pop <= 0) {
-    ctx.fillStyle = 'rgba(255,255,255,0.45)'; ctx.strokeStyle = 'rgba(255,255,255,0.35)'; ctx.lineWidth = 4;
-    roundRect(x, y, s, s, 4); ctx.fill(); ctx.stroke();
+    ctx.save(); ctx.globalAlpha = SLOT_ALPHA * 0.8; ctx.translate(x + s / 2, y + s / 2);
+    slotFrame(s, '#ffffff', '#cccccc'); ctx.restore();
     if (!type) return;
   }
   const d = PETALS[type] || {}, [fill, edge] = RARITY[d.rarity] || RARITY.common;
   ctx.save(); ctx.translate(x + s / 2, y + s / 2 + (bob ? Math.sin(bob) * 2 : 0)); if (bob) ctx.rotate(Math.sin(bob * 0.8) * 0.06);
-  ctx.scale(pop, pop);
-  ctx.fillStyle = edge; roundRect(-s / 2, -s / 2, s, s, 5); ctx.fill();
-  ctx.fillStyle = fill; roundRect(-s / 2 + 5, -s / 2 + 5, s - 10, s - 10, 3); ctx.fill();
-  drawPetalIcon(type, 0, -s * 0.1, s / 56 * 0.8);
-  label(d.name || type, 0, s * 0.33, Math.round(s * 0.24), 'center');
-  if (ready < 1) {                         // recharge: dark wedge that sweeps away clockwise
-    ctx.save(); roundRect(-s / 2, -s / 2, s, s, 5); ctx.clip();
-    ctx.fillStyle = 'rgba(0,0,0,0.3)'; ctx.beginPath(); ctx.moveTo(0, 0);
-    ctx.arc(0, 0, s, -Math.PI / 2 + ready * TAU, -Math.PI / 2 + TAU); ctx.closePath(); ctx.fill();
+  ctx.scale(pop, pop); ctx.globalAlpha = SLOT_ALPHA;
+  if (ready < 1) {
+    slotFrame(s, fill, edge, shade(fill, 0.635));
+    const b = s * 0.08, q = Math.pow(Math.max(0, ready), 1.7), a0 = q * Math.PI * 10;
+    ctx.save(); ctx.beginPath(); ctx.rect(-s / 2 + b, -s / 2 + b, s - 2 * b, s - 2 * b); ctx.clip();
+    ctx.fillStyle = fill; ctx.beginPath(); ctx.moveTo(0, 0); ctx.arc(0, 0, s, a0, a0 + q * TAU); ctx.closePath(); ctx.fill();
     ctx.restore();
-  }
+  } else slotFrame(s, fill, edge);
+  drawPetalIcon(type, 0, -s * 0.09, s / 56 * 0.8);
+  labelU(d.name || type, 0, s * 0.3, s * 0.21, 'center', s * 0.86);
   ctx.restore();
 }
 function drawInventory(W, H, me) {
@@ -645,26 +747,32 @@ function drawInventory(W, H, me) {
     let shown = inv.ready[r.i];
     if (s) {
       const srv = s[1], rel = (PETALS[s[0]] || {}).reload || 1;
+      // learn how fast this slot is really filling (overleveled reloads are quicker than normal)
+      inv.rate = inv.rate || []; inv.last = inv.last || [];
+      const L0 = inv.last[r.i];
+      if (L0 && srv > L0.v && srv < 1) inv.rate[r.i] = (srv - L0.v) / Math.max(0.02, now2 / 1000 - L0.t);
+      if (!L0 || srv !== L0.v) inv.last[r.i] = { v: srv, t: now2 / 1000 };
+      const rate = srv <= 0 ? 0 : (inv.rate[r.i] || 1 / rel);
       if (srv >= 1) shown = 1;
       else if (shown === undefined || Math.abs(shown - srv) > 0.2 || shown >= 1) shown = srv;
-      else shown = Math.min(shown + dtI / rel, srv + 0.06);
+      else shown = Math.min(shown + dtI * rate, srv + 0.06);
       inv.ready[r.i] = shown;
     }
     drawSlotBox(r.x, r.y, r.s, hidden('e', r.i) ? null : s && s[0], s ? shown : 1);
-    label(`[${r.i + 1}]`, r.x + r.s / 2, r.y - 8, 12, 'center');
+    labelU(`[${r.i + 1}]`, r.x + r.s / 2, r.y - r.s * 0.12, r.s * 0.17);
   });
   L.bench.forEach(r => {
     const sel = r.i === inv.sel, g = sel ? 6 : 0;
     drawSlotBox(r.x - g / 2, r.y - g / 2, r.s + g, hidden('b', r.i) ? null : me.bench[r.i], 1, sel ? t * 6 : 0, popScale(r.i));
   });
   const tr = L.trash;
-  ctx.fillStyle = inv.open ? '#e27d70' : '#b48a74'; ctx.strokeStyle = inv.open ? '#c56457' : '#9a7360'; ctx.lineWidth = 4;
-  roundRect(tr.x, tr.y, tr.s, tr.s, 4); ctx.fill(); ctx.stroke();
-  label('Delete', tr.x + tr.s / 2, tr.y + tr.s / 2 + 4, 10, 'center');
+  ctx.save(); ctx.globalAlpha = SLOT_ALPHA * 0.8; ctx.translate(tr.x + tr.s / 2, tr.y + tr.s / 2);
+  slotFrame(tr.s, '#ff7676', '#cc5e5e'); ctx.restore();
+  labelU('Delete', tr.x + tr.s / 2, tr.y + tr.s / 2 + tr.s * 0.08, tr.s * 0.2);
   label('[T]', tr.x + tr.s + 6, tr.y + 10, 12, 'left');
 
   ctx.fillStyle = 'rgba(0,0,0,0.42)'; roundRect(L.hint.x, L.hint.y, L.hint.w, L.hint.h + 12, 10); ctx.fill();
-  label(inv.open ? 'You can also use [Q] and [E] to modify the inventory' : 'Move mouse here to disable movement', W / 2, H - 9, 14, 'center');
+  labelU(inv.open ? 'You can also use [Q] and [E] to modify the inventory' : 'Move mouse here to disable movement', W / 2, H - L.hint.h * 0.32, L.hint.h * 0.42, 'center', L.hint.w * 0.94);
 
   // Petals sliding between slots
   inv.anims = inv.anims.filter(a => t < a.t0 + a.dur + 0.02);
@@ -673,7 +781,7 @@ function drawInventory(W, H, me) {
     const x = a.from.x + (a.to.x - a.from.x) * k, y = a.from.y + (a.to.y - a.from.y) * k, s = a.from.s + (a.to.s - a.from.s) * k;
     drawSlotBox(x, y, s, a.type, 1, 0, a.shrink ? 1 - k * 0.8 : 1);
   }
-  if (inv.drag) drawSlotBox(input.mx - 28, input.my - 28, 56, inv.drag.type);
+  if (inv.drag) { const ds = 70 * uiScale(H); drawSlotBox(input.mx - ds / 2, input.my - ds / 2, ds, inv.drag.type); }
 }
 
 // Overleveled: screen dims a little, and a small banner floats above your flower
@@ -710,7 +818,7 @@ function frame(ts) {
   const dt = Math.min(0.1, (ts - lastFrame) / 1000 || 0); lastFrame = ts;
   const W = innerWidth, H = innerHeight, t = now();
   ctx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
-  if (!MAP || !state.me) { ctx.fillStyle = '#2fa86a'; ctx.fillRect(0, 0, W, H); return; }
+  if (!MAP || !state.me || homeAfterDeath) { ctx.fillStyle = '#2fa86a'; ctx.fillRect(0, 0, W, H); return; }   // plain green behind the home screen
 
   const kPos = 1 - Math.exp(-dt * 18), kHp = 1 - Math.exp(-dt * 7), kFlash = Math.exp(-dt * 22);
   const pseen = new Set();
@@ -718,7 +826,7 @@ function frame(ts) {
     const v = view[p.id]; pseen.add(String(p.id));
     if (Math.hypot(v.x - p.x, v.y - p.y) > 400) { v.x = p.x; v.y = p.y; }
     v.x += (p.x - v.x) * kPos; v.y += (p.y - v.y) * kPos; v.pr += (p.pr - v.pr) * kPos;
-    v.ang += SPIN * (p.sp || 1) * dt; v.ang += angDiff(v.ang, p.pa) * (1 - Math.exp(-dt * 4));
+    v.ang += SPIN * (p.sp ?? 1) * dt; v.ang += angDiff(v.ang, p.pa) * (1 - Math.exp(-dt * 4));
     v.hp += (p.hp - v.hp) * kHp;                           // health drains/fills like liquid
     v.flash *= kFlash; if (v.flash < 0.02) v.flash = 0;
   }
@@ -776,7 +884,7 @@ function frame(ts) {
       // Every petal has its own id, so it keeps its own smooth position even
       // when petals are swapped in/out or the ring grows/shrinks.
       const live = new Set(), kOff = 1 - Math.exp(-dt * 10), kRf = 1 - Math.exp(-dt * 14);
-      for (const [type, alive, rr, uid, off, php] of p.pt) {
+      for (const [type, alive, rr, uid, off, php, ck] of p.pt) {
         live.add(uid);
         let s = v.rf[uid];
         if (!s) s = v.rf[uid] = { off, r: 0, hp: php, flash: 0 };
@@ -786,7 +894,9 @@ function frame(ts) {
         s.hp = php; s.flash *= kFlash;
         s.r += (rr - s.r) * kRf;                           // grows out from the flower on respawn
         const a = v.ang + s.off, dist = v.pr * s.r;
-        drawPetal(sx + Math.cos(a) * dist, sy + Math.sin(a) * dist, type, 1, a, 1, s.flash);
+        let px = sx + Math.cos(a) * dist, py = sy + Math.sin(a) * dist;
+        if (ck >= 0) { const ca = a + ck * TAU / 3, cr = ((PETALS[type] || {}).radius || 8) * 1.15 * Math.min(1, s.r); px += Math.cos(ca) * cr; py += Math.sin(ca) * cr; }   // triangle cluster
+        drawPetal(px, py, type, 1, a, 1, s.flash);
       }
       for (const k in v.rf) if (!live.has(+k)) delete v.rf[k];
     }
@@ -795,7 +905,8 @@ function frame(ts) {
   // Pea projectiles in flight
   for (const s of Object.values(sview)) { s.x += (s.tx - s.x) * kPos; s.y += (s.ty - s.y) * kPos;
     if (s.type === 'hornetMissile') { drawDart(s.x + ox, s.y + oy, s.ang); continue; }
-    drawPetal(s.x + ox, s.y + oy, s.type, (PETALS[s.type] || {}).shape === 'missile' ? 1 : 0.7, s.ang, 1, 0, true); }
+    const sd = PETALS[s.type] || {};
+    drawPetal(s.x + ox, s.y + oy, s.type, sd.shape === 'missile' || sd.drop ? 1 : 0.7, s.ang, 1, 0, true); }
   ctx.restore();
 
   if (state.me.ol && !death && self) drawOverleveled(W, H, (view[self.id].x + ox) * zoomCur, (view[self.id].y + oy) * zoomCur, state.me.ol);
@@ -834,7 +945,8 @@ function showGallery(tab) {
         else drawMob({ id: 3, type, r: r * sc, ang: -0.4, flash: 0, head: 1 }, s / 2, s / 2);
       }));
       const info = document.createElement('div');
-      const zones = Object.keys(m.zones || {}).map(z => (m.zoneRange || {})[z] ? `${z} (right half)` : z).join(', ') || `From ${m.from || '?'}`;
+      const part = r => !r ? '' : r[0] >= 0.5 ? ' (right half)' : r[1] <= 0.5 ? ' (left half)' : '';
+      const zones = Object.keys(m.zones || {}).map(z => z + part((m.zoneRange || {})[z])).join(', ') || `From ${m.from || '?'}`;
       info.innerHTML = `<b>${m.name}</b>HP ${m.healthRange ? m.healthRange.join('–') : m.health}${m.segments ? ' per segment' : ''} · Dmg ${m.damage} · XP ${m.xp}<br>Zones: ${zones}<br>`;
       for (const [pt, ch] of Object.entries(m.drops || {})) {
         if (!P[pt]) continue;
@@ -846,7 +958,9 @@ function showGallery(tab) {
       card.appendChild(info); el.appendChild(card);
     }
   } else {
-    for (const [type, p] of Object.entries(P)) {
+    const RK = ['common', 'unusual', 'rare', 'epic', 'legendary', 'unique'];   // rarity first, then A-Z
+    const sortedP = Object.entries(P).sort(([, a], [, b]) => RK.indexOf(a.rarity) - RK.indexOf(b.rarity) || a.name.localeCompare(b.name));
+    for (const [type, p] of sortedP) {
       const card = document.createElement('div'); card.className = 'card';
       card.appendChild(iconCanvas(56, s => drawDropBox(s / 2, s / 2, type, s)));
       const info = document.createElement('div');
@@ -862,4 +976,63 @@ fetch('/gallery.json').then(r => r.json()).then(d => {
   galleryData = d;
   if (!Object.keys(PETALS).length) PETALS = d.petals;
   if (galleryTab) { const t = galleryTab; galleryTab = null; showGallery(t); }
+  updateSpawnInfo();
 });
+
+
+// ---------- Custom start (title screen) ----------
+// Pick a starting level, zone and petals. Saved in this browser and used when you press Play.
+const START_KEY = 'petalArenaStart';
+let startCfg = { armed: false, level: 1, zone: 'auto', petals: [], bench: [] };
+try { Object.assign(startCfg, JSON.parse(localStorage.getItem(START_KEY)) || {}); } catch (e) {}
+const saveStart = () => { try { localStorage.setItem(START_KEY, JSON.stringify(startCfg)); } catch (e) {} };
+const slotsFor = l => 5 + [15, 30, 45].filter(x => l >= x).length;
+// A saved custom start is used once, for your next spawn (first join or after dying)
+function takeCustomStart() {
+  if (!startCfg.armed) return null;
+  const st = { level: startCfg.level, zone: startCfg.zone === 'auto' ? null : startCfg.zone, petals: startCfg.petals.slice(0, slotsFor(startCfg.level)), bench: startCfg.bench };
+  startCfg.armed = false; saveStart(); updateSpawnInfo();
+  return st;
+}
+let pickTarget = { row: 'petals', i: 0 };
+function renderStart() {
+  const P = (galleryData && galleryData.petals) || PETALS, el = $('startBody');
+  if (!Object.keys(P).length) { el.textContent = 'Loading…'; return; }
+  if (!Object.keys(PETALS).length) PETALS = P;
+  const n = slotsFor(startCfg.level);
+  $('startLevel').value = startCfg.level; $('startLevelNum').textContent = startCfg.level;
+  $('startZone').value = startCfg.zone;
+  const box = (t, size, sel) => { const c = iconCanvas(size, s => drawSlotBox(0, 0, s, t || null)); c.className = 'pslot' + (sel ? ' sel' : ''); return c; };
+  const row = (name, count, size) => {
+    const r = document.createElement('div'); r.className = 'prow';
+    for (let i = 0; i < count; i++) {
+      const c = box(startCfg[name][i], size, pickTarget.row === name && pickTarget.i === i);
+      c.onclick = () => { pickTarget = { row: name, i }; renderStart(); };
+      c.oncontextmenu = e => { e.preventDefault(); startCfg[name][i] = null; saveStart(); renderStart(); };
+      r.appendChild(c);
+    }
+    return r;
+  };
+  el.innerHTML = '';
+  const h = t => { const d = document.createElement('div'); d.className = 'plabel'; d.textContent = t; return d; };
+  el.append(h(`Loadout (${n} slots at level ${startCfg.level})`), row('petals', n, 46), h('Bench'), row('bench', 8, 38),
+    h('Click a slot, then a petal · right-click a slot to empty it'));
+  const pal = document.createElement('div'); pal.className = 'ppal';
+  const RANKS = ['common', 'unusual', 'rare', 'epic', 'legendary', 'unique'];
+  const order = Object.keys(P).sort((a, b) => RANKS.indexOf(P[a].rarity) - RANKS.indexOf(P[b].rarity) || P[a].name.localeCompare(P[b].name));
+  for (const t of order) { const c = box(t, 40, false); c.title = P[t].name; c.onclick = () => {
+    startCfg[pickTarget.row][pickTarget.i] = t;
+    if (pickTarget.row === 'petals' && pickTarget.i >= n - 1) pickTarget = { row: 'bench', i: 0 };   // loadout full: carry on into the bench
+    else pickTarget.i = Math.min((pickTarget.row === 'petals' ? n : 8) - 1, pickTarget.i + 1);
+    saveStart(); renderStart(); }; pal.appendChild(c); }
+  el.appendChild(pal);
+}
+$('startOpen').onclick = () => { $('startModal').classList.remove('hidden'); renderStart(); };
+$('startClose').onclick = () => $('startModal').classList.add('hidden');
+$('startModal').onclick = e => { if (e.target === $('startModal')) $('startModal').classList.add('hidden'); };
+$('startLevel').oninput = e => { startCfg.level = +e.target.value; saveStart(); renderStart(); };
+$('startZone').onchange = e => { startCfg.zone = e.target.value; saveStart(); };
+$('startSave').onclick = () => { startCfg.armed = true; saveStart(); updateSpawnInfo(); const b = $('startSave'); b.textContent = 'Saved ✓'; setTimeout(() => { b.textContent = 'Save'; $('startModal').classList.add('hidden'); }, 450); };
+$('startClear').onclick = () => { Object.assign(startCfg, { armed: false, level: 1, zone: 'auto', petals: [], bench: [] }); pickTarget = { row: 'petals', i: 0 }; saveStart(); renderStart(); updateSpawnInfo(); };
+
+updateSpawnInfo();   // a custom start saved earlier shows up straight away

@@ -5,19 +5,20 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Petal Arena</title>
 <style>
+  @font-face { font-family: 'Ubuntu'; font-weight: 700; src: url('fonts/ubuntu-700.woff2') format('woff2'); font-display: block; }
   html, body { margin: 0; height: 100%; overflow: hidden; background: #1d2b22; font-family: system-ui, -apple-system, sans-serif; user-select: none; }
   canvas { display: block; }
   .overlay { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; background: rgba(15, 30, 20, 0.55); gap: 14px; }
   .overlay h1 { margin: 0; font-size: 56px; color: #fff; letter-spacing: 2px; text-shadow: 0 4px 0 #2a5c3e; }
-  .overlay p { margin: 0; color: #dfeee4; font-size: 14px; }
   input { font-size: 20px; padding: 10px 14px; border-radius: 10px; border: 3px solid #2a5c3e; outline: none; width: 240px; text-align: center; }
   button { font-size: 20px; padding: 10px 28px; border-radius: 10px; border: 3px solid #2a5c3e; background: #6fd18f; color: #12301f; font-weight: 700; cursor: pointer; }
   button:hover { background: #8ee0a8; }
   .hidden { display: none; }
-  .help { color: #cfe3d6; font-size: 13px; line-height: 1.6; text-align: center; }
+  .help { position: absolute; bottom: 14px; left: 0; right: 0; color: rgba(220,238,226,0.7); font-size: 12px; text-align: center; }
   .tabs { display: flex; gap: 10px; }
   .tabs button { font-size: 15px; padding: 6px 18px; background: #e9f5ec; }
   .tabs button.on { background: #6fd18f; }
+  #gallery.hidden { display: none; }
   #gallery { width: min(760px, calc(100vw - 32px)); max-height: 46vh; overflow-y: auto; background: rgba(0,0,0,0.35);
     border-radius: 12px; padding: 12px; box-sizing: border-box; display: grid; gap: 10px;
     grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); }
@@ -26,6 +27,30 @@
   .card b { font-size: 15px; display: block; margin-bottom: 3px; }
   .card .drop { display: inline-flex; align-items: center; gap: 4px; margin: 3px 6px 0 0; }
   .card .drop canvas { border-radius: 3px; }
+  .mrow button.save { margin-left: auto; background: #6fd18f; }
+  button.small { font-size: 14px; padding: 6px 16px; background: #e9f5ec; }
+  .modal { position: fixed; inset: 0; background: rgba(0,0,0,0.45); display: flex; align-items: center; justify-content: center; z-index: 20; }
+  .modal.hidden { display: none; }
+  .mbox { background: #1f5a3a; border: 4px solid #143d27; border-radius: 12px; padding: 14px 16px; width: min(440px, calc(100vw - 32px)); max-height: calc(100vh - 32px); overflow: auto;
+    color: #fff; font: 700 14px Ubuntu, system-ui, sans-serif; display: flex; flex-direction: column; gap: 8px; }
+  .mhead { display: flex; justify-content: space-between; align-items: center; font-size: 16px; }
+  .mhead input { width: auto; }
+  .mhead label { display: flex; gap: 8px; align-items: center; cursor: pointer; }
+  .x { font-size: 16px; padding: 2px 10px; background: transparent; border: none; color: #fff; }
+  .mrow { display: flex; gap: 10px; align-items: center; }
+  .mrow input[type=range] { flex: 1; -webkit-appearance: none; appearance: none; height: 8px; border-radius: 4px; background: #143d27; outline: none; margin: 0; padding: 0; }
+  .mrow input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 22px; height: 22px; border-radius: 50%; background: #fff; border: 2px solid #143d27; cursor: pointer; }
+  .mrow input[type=range]::-moz-range-thumb { width: 18px; height: 18px; border-radius: 50%; background: #fff; border: 2px solid #143d27; cursor: pointer; }
+  .mrow select { font: inherit; padding: 4px 8px; border-radius: 6px; }
+  .plabel { font-size: 12px; color: #d9efe1; margin-top: 4px; }
+  .prow, .ppal { display: flex; flex-wrap: wrap; gap: 6px; }
+  .ppal { max-height: 190px; overflow: auto; padding: 6px; background: rgba(0,0,0,0.18); border-radius: 8px; }
+  .pslot { cursor: pointer; border-radius: 4px; }
+  .pslot.sel { outline: 3px solid #fff; outline-offset: 1px; }
+  .mnote { font-size: 12px; color: #cfe3d6; }
+  #spawnInfo { display: flex; flex-direction: column; align-items: center; gap: 8px; color: #fff; font: 700 16px Ubuntu, system-ui, sans-serif; text-shadow: 0 0 3px #000; }
+  #spawnInfo.hidden { display: none; }
+  .rrow { justify-content: center; }
 </style>
 </head>
 <body>
@@ -35,9 +60,21 @@
   <h1>Petal Arena</h1>
   <input id="name" maxlength="16" placeholder="Your name" autofocus>
   <button id="play">Play</button>
-  <div class="help">Move: mouse (or WASD / arrows) · Attack: left click / Space · Defend: right click / Shift</div>
-  <div class="tabs"><button id="tabMobs">Mobs</button><button id="tabPetals">Petals</button></div>
+  <div id="spawnInfo" class="hidden"></div>
+  <div class="tabs"><button id="tabMobs">Mobs</button><button id="tabPetals">Petals</button><button id="startOpen">Custom start</button></div>
   <div id="gallery" class="hidden"></div>
+  <div class="help">Move: mouse or WASD · Attack: left click / Space · Defend: right click / Shift</div>
+</div>
+
+<div id="startModal" class="modal hidden">
+  <div class="mbox">
+    <div class="mhead"><span>Custom start</span><button id="startClose" class="x">✕</button></div>
+    <div class="mrow">Level <input type="range" id="startLevel" min="1" max="75"> <b id="startLevelNum">1</b></div>
+    <div class="mrow">Zone <select id="startZone"><option value="auto">By level</option><option>Easy</option><option>Medium</option><option>Hard</option><option value="?">?</option></select></div>
+    <div id="startBody"></div>
+    <div class="mrow"><button id="startClear" class="small">Reset</button><button id="startSave" class="small save">Save</button></div>
+    <div class="mnote">Save to use it for your next spawn (also after dying). Reset turns it off.</div>
+  </div>
 </div>
 
 <script src="client.js"></script>
