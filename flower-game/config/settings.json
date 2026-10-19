@@ -60,7 +60,8 @@
       14
     ],
     "flowerBumpKnockback": 2,
-    "uniqueBasicChance": 0.001
+    "uniqueBasicChance": 0.001,
+    "spawnClearance": 150
   },
   "petals": {
     "orbitRadius": 65,

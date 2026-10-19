@@ -92,7 +92,21 @@ function spawn(p, start) {
   }
   const zone = (start && start.zone) || zoneForLevel(p.level);
   const [zx0, zx1] = zoneBounds[zone];
-  p.x = rand(zx0 + 200, zx1 - 200); p.y = rand(200, MAP_H - 200);
+  // Pick a spot that isn't on top of (or right next to) any mob: try random spots and keep the
+  // first one that's clear; if the zone is packed, use the roomiest one found
+  let best = null, bestGap = -Infinity;
+  for (let tries = 0; tries < 80; tries++) {
+    const x = rand(zx0 + 200, zx1 - 200), y = rand(200, MAP_H - 200);
+    let gap = Infinity;
+    for (const m of mobs.values()) {
+      if (m.owner) continue;
+      const g = Math.hypot(m.x - x, m.y - y) - m.r - S.flower.radius;
+      if (g < gap) gap = g;
+    }
+    if (gap > bestGap) { bestGap = gap; best = { x, y }; }
+    if (gap >= S.flower.spawnClearance) break;
+  }
+  p.x = best.x; p.y = best.y;
   p.vx = p.vy = p.kx = p.ky = 0; p.poison = null; p.slowUntil = 0;
   p.everSpawned = true;
   p.score = 0; for (let l = 1; l < p.level; l++) p.score += xpForLevel(l);   // points match the level you start at
