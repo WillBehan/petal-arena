@@ -241,7 +241,8 @@
     "deathLoseChance": 0.1,
     "respawnPetals": 8,
     "deathSkipChance": 0.05,
-    "pollenSwapChance": 0.01
+    "pollenSwapChance": 0.01,
+    "soldMemory": 180
   },
   "mobs": {
     "respawnInterval": 1,

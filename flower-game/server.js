@@ -130,6 +130,8 @@ function spawn(p, start) {
   if (firstTime && !start && PETALS.basicUnique && Math.random() < S.flower.uniqueBasicChance && !uniqueTaken('basicUnique', p) && p.petals.length)
     p.petals[0] = makeSlot('basicUnique', false);
   p.keep = [];
+  // This run's stats (shown when you die) and the petals you sold
+  p.runStart = gameNow(); p.kills = {}; p.picked = {}; p.sold = [];
   // Every petal you have during this run, for the respawn top-up
   p.history = [...p.petals.filter(Boolean).map(s => s.type), ...p.bench.filter(Boolean)].filter(t => t !== 'basic');
 }
@@ -163,6 +165,12 @@ function killPlayer(p, byName) {
   const all = [];
   p.petals.forEach(s => { if (s && s.type !== 'basic') all.push(s.type); });
   p.bench.forEach(t => { if (t && t !== 'basic') all.push(t); });
+  // Selling a petal right before dying doesn't save it: anything sold in the last 3 minutes
+  // still counts as yours here (it can drop, or come back in your respawn kit). Petals sold
+  // longer ago are gone for good - they can't drop and you can't respawn with them.
+  const tNow = gameNow(), sold = p.sold || [];
+  const oldSold = sold.filter(x => tNow - x.t > S.drops.soldMemory).map(x => x.type);
+  sold.filter(x => tNow - x.t <= S.drops.soldMemory && (PETALS[x.type].rarity !== 'unique' || !uniqueTaken(x.type, p))).forEach(x => all.push(x.type));
   // Like the original: your best petals (ties broken randomly) fall on the ground,
   // each remaining one has a 10% chance to be lost, Basics are never kept,
   // and you come back at 3/4 of your level.
@@ -182,6 +190,7 @@ function killPlayer(p, byName) {
   const max = S.drops.respawnPetals, used = {};
   for (const t of all) used[t] = (used[t] || 0) + 1;
   const pool = [];
+  for (const t of oldSold) used[t] = (used[t] || 0) + 1;      // sold long ago: not in the pool either
   for (const t of p.history || []) { if (used[t] > 0) used[t]--; else pool.push(t); }
   for (let i = pool.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [pool[i], pool[j]] = [pool[j], pool[i]]; }
   pool.sort((a, b) => RANK[PETALS[b].rarity] - RANK[PETALS[a].rarity]);
@@ -192,8 +201,13 @@ function killPlayer(p, byName) {
     p.keep.push(t);
   }
   p.respawnLevel = Math.max(1, Math.floor(p.level * 0.75));
+  // Run stats for the death screen: time alive, score, level, kills (5 or more of a mob) and
+  // the petal you picked up most
+  const kills = Object.entries(p.kills || {}).filter(([, n]) => n >= 5).sort((a, b) => b[1] - a[1]).map(([t, n]) => [MOBS[t] ? MOBS[t].name : t, n]);
+  const top = Object.entries(p.picked || {}).filter(([t]) => PETALS[t]).sort((a, b) => b[1] - a[1] || RANK[PETALS[b[0]].rarity] - RANK[PETALS[a[0]].rarity])[0];
+  const stats = { time: Math.round(tNow - (p.runStart ?? tNow)), score: p.score, level: p.level, kills, top: top ? { type: top[0], n: top[1] } : null };
   p.score = 0;
-  send(p, { t: 'dead', by: byName, level: p.respawnLevel, keep: p.keep, slots: slotCount(p.respawnLevel) });
+  send(p, { t: 'dead', by: byName, level: p.respawnLevel, keep: p.keep, slots: slotCount(p.respawnLevel), stats });
 }
 
 // ---------- Mobs ----------
@@ -323,7 +337,10 @@ function killMob(m) {
     }
   }
   const def = MOBS[m.type], killer = players.get(m.lastHitBy);
-  if (killer && !killer.dead) addXp(killer, Math.round(def.xp * S.leveling.xpMultiplier));
+  if (killer && !killer.dead) {
+    addXp(killer, Math.round(def.xp * S.leveling.xpMultiplier));
+    killer.kills = killer.kills || {}; killer.kills[m.type] = (killer.kills[m.type] || 0) + 1;
+  }
   // A Unique petal (Square) doesn't drop if one already exists somewhere on the server
   const got = Object.entries(def.drops || {}).filter(([type, chance]) => PETALS[type] && Math.random() < chance &&
     !(PETALS[type].rarity === 'unique' && uniqueTaken(type, null))).map(([t]) => t);
@@ -1006,6 +1023,7 @@ function tick() {
       if (eSlot < 0 && slot < 0) continue;
       if (eSlot >= 0) p.petals[eSlot] = makeSlot(d.type); else p.bench[slot] = d.type;
       if (d.type !== 'basic') (p.history = p.history || []).push(d.type);
+      p.picked = p.picked || {}; p.picked[d.type] = (p.picked[d.type] || 0) + 1;   // for "most collected petal" 
       drops.delete(d.id);
       send(p, { t: 'pick', row: eSlot >= 0 ? 'e' : 'b', slot: eSlot >= 0 ? eSlot : slot });
       break;
@@ -1060,6 +1078,7 @@ function trashSlot(p, s) {
   if (!type) return;
   slotSet(p, s.row, s.i, null);
   addXp(p, Math.round((PETALS[type].trashXp || 0) * S.leveling.xpMultiplier));
+  if (type !== 'basic') (p.sold = p.sold || []).push({ type, t: gameNow() });   // remembered for 3 minutes (see killPlayer)
 }
 
 function send(p, msg) { if (p.ws && p.ws.readyState === 1) p.ws.send(JSON.stringify(msg)); }

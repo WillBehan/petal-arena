@@ -39,7 +39,7 @@ function join() {
     const m = JSON.parse(e.data);
     if (m.t === 'init') { myId = m.id; MAP = m.map; PETALS = m.petals; MOBDEFS = m.mobs; FR = m.flowerRadius; SPIN = m.spin; ZOOM = m.zoom || 1; irisOpen(); }
     else if (m.t === 's') onState(m);
-    else if (m.t === 'dead') death = { by: m.by, t: now(), level: m.level, keep: m.keep || [], slots: m.slots || 5 };
+    else if (m.t === 'dead') death = { by: m.by, t: now(), level: m.level, keep: m.keep || [], slots: m.slots || 5, stats: m.stats };
     else if (m.t === 'pause') paused = m.on ? { by: m.by } : null;
     else if (m.t === 'pick' && m.row !== 'e') inv.pops[m.slot] = now() + 0.18;   // bench slot pops in as the drop arrives
   };
@@ -810,9 +810,40 @@ function drawDeathScreen(W, H) {
   const k = ease((now() - death.t) / 0.4);
   ctx.fillStyle = `rgba(0,0,0,${0.3 * k})`; ctx.fillRect(0, 0, W, H);
   ctx.save(); ctx.globalAlpha = k;
-  label('You were destroyed by', W / 2, H / 2 - 70, 18, 'center');
-  label(death.by || 'the void', W / 2, H / 2 - 40, 30, 'center');
-  label('(press Enter or click to continue)', W / 2, H / 2 + 60, 15, 'center', '#e8f2ea');
+  const st = death.stats, kills = st ? st.kills : [];
+  const rows = Math.ceil(kills.length / 2), top = H / 2 - 150 - rows * 11;
+  // dark panel behind the text so it reads over the busy game
+  const hasTop = st && st.top && PETALS[st.top.type];
+  const ph = 80 + (st ? 64 + (hasTop ? 66 : 0) + (kills.length ? 30 + rows * 22 : 0) : 0) + 80;
+  ctx.fillStyle = 'rgba(0,0,0,0.4)'; roundRect(W / 2 - 270, top - 40, 540, ph, 16); ctx.fill();
+  label('You were destroyed by', W / 2, top, 18, 'center');
+  label(death.by || 'the void', W / 2, top + 32, 30, 'center');
+  let y = top + 80;
+  if (st) {
+    // Run stats: time alive, score, level, most collected petal, kills (5+ of a mob)
+    const mm = Math.floor(st.time / 60), ss = String(st.time % 60).padStart(2, '0');
+    const hh = Math.floor(mm / 60), tStr = hh ? `${hh}:${String(mm % 60).padStart(2, '0')}:${ss}` : `${mm}:${ss}`;
+    const cells = [['Score', fmtScore(st.score)], ['Level', st.level], ['Run time', tStr]];
+    cells.forEach(([k, v], i) => { const cx = W / 2 + (i - 1) * 150;
+      label(k, cx, y, 14, 'center', '#cfe3d4'); label(String(v), cx, y + 26, 24, 'center'); });
+    y += 64;
+    if (st.top && PETALS[st.top.type]) {
+      label('Most collected petal', W / 2, y, 14, 'center', '#cfe3d4');
+      drawDropBox(W / 2 - 60, y + 26, st.top.type, 40);
+      label(`${PETALS[st.top.type].name} ×${st.top.n}`, W / 2 - 30, y + 32, 20, 'left');
+      y += 66;
+    }
+    if (kills.length) {
+      label('Kills', W / 2, y, 14, 'center', '#cfe3d4'); y += 24;
+      kills.forEach(([name, n], i) => {
+        const lone = i === kills.length - 1 && kills.length % 2 === 1;   // an odd one out goes in the middle
+        const col = lone ? 0 : (i % 2 ? 1 : -1), row = Math.floor(i / 2);
+        label(`${name}  ×${n}`, W / 2 + col * 100, y + row * 22, 16, 'center');
+      });
+      y += rows * 22 + 6;
+    }
+  }
+  label('(press Enter or click to continue)', W / 2, y + 16, 15, 'center', '#e8f2ea');
   ctx.restore();
 }
 
@@ -831,7 +862,8 @@ function frame(ts) {
     const v = view[p.id]; pseen.add(String(p.id));
     if (Math.hypot(v.x - p.x, v.y - p.y) > 400) { v.x = p.x; v.y = p.y; }
     v.x += (p.x - v.x) * kPos; v.y += (p.y - v.y) * kPos; v.pr += (p.pr - v.pr) * kPos;
-    v.ang += SPIN * (p.sp ?? 1) * (paused ? 0 : dt);   // frozen while paused v.ang += angDiff(v.ang, p.pa) * (1 - Math.exp(-dt * 4));
+    v.ang += SPIN * (p.sp ?? 1) * (paused ? 0 : dt);   // spin (frozen while paused)
+    v.ang += angDiff(v.ang, p.pa) * (1 - Math.exp(-dt * 4));
     v.hp += (p.hp - v.hp) * kHp;                           // health drains/fills like liquid
     v.flash *= kFlash; if (v.flash < 0.02) v.flash = 0;
   }
