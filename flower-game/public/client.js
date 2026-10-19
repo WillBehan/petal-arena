@@ -14,6 +14,9 @@ let wview = [];               // web patches on the ground
 let zoomCur = null;           // eases toward the target zoom (Antennae widen the view)
 let state = { players: [], mobs: [], drops: [], me: null };
 let death = null;                       // { by, t } while the death screen is up
+let paused = null;                      // { by } while someone has paused the game
+const PAUSE_BTN = { x: 16, y: 16, s: 48 }; // pause button, top left
+const onPauseBtn = (x, y) => x >= PAUSE_BTN.x && x <= PAUSE_BTN.x + PAUSE_BTN.s && y >= PAUSE_BTN.y && y <= PAUSE_BTN.y + PAUSE_BTN.s;
 const view = {}, mview = {}, dview = {}; // smoothed players / mobs / drops
 const ghosts = [];                      // fading-out mobs, drops flying to a flower
 const cam = { x: 0, y: 0 };
@@ -37,10 +40,11 @@ function join() {
     if (m.t === 'init') { myId = m.id; MAP = m.map; PETALS = m.petals; MOBDEFS = m.mobs; FR = m.flowerRadius; SPIN = m.spin; ZOOM = m.zoom || 1; irisOpen(); }
     else if (m.t === 's') onState(m);
     else if (m.t === 'dead') death = { by: m.by, t: now(), level: m.level, keep: m.keep || [], slots: m.slots || 5 };
+    else if (m.t === 'pause') paused = m.on ? { by: m.by } : null;
     else if (m.t === 'pick' && m.row !== 'e') inv.pops[m.slot] = now() + 0.18;   // bench slot pops in as the drop arrives
   };
   ws.onclose = () => {
-    homeAfterDeath = null; death = null; myId = null;              // so Play joins again instead of waiting for a respawn
+    homeAfterDeath = null; death = null; myId = null; paused = null;              // so Play joins again instead of waiting for a respawn
     showTitle(); $('title').querySelector('h1').textContent = 'Disconnected'; updateSpawnInfo();
   };
 }
@@ -226,6 +230,7 @@ addEventListener('mousemove', e => {
   if (inv.press && !inv.drag && Math.hypot(e.clientX - inv.press.x, e.clientY - inv.press.y) > 6) inv.drag = inv.press;
 });
 cv.addEventListener('mousedown', e => {
+  if (!death && state.me && !homeAfterDeath && e.button === 0 && onPauseBtn(e.clientX, e.clientY)) { send({ t: 'pause' }); return; }
   if (death) { respawn(); return; }
   if (e.button === 0) {                                     // petals can be grabbed any time
     const r = slotAt(e.clientX, e.clientY);
@@ -826,7 +831,7 @@ function frame(ts) {
     const v = view[p.id]; pseen.add(String(p.id));
     if (Math.hypot(v.x - p.x, v.y - p.y) > 400) { v.x = p.x; v.y = p.y; }
     v.x += (p.x - v.x) * kPos; v.y += (p.y - v.y) * kPos; v.pr += (p.pr - v.pr) * kPos;
-    v.ang += SPIN * (p.sp ?? 1) * dt; v.ang += angDiff(v.ang, p.pa) * (1 - Math.exp(-dt * 4));
+    v.ang += SPIN * (p.sp ?? 1) * (paused ? 0 : dt);   // frozen while paused v.ang += angDiff(v.ang, p.pa) * (1 - Math.exp(-dt * 4));
     v.hp += (p.hp - v.hp) * kHp;                           // health drains/fills like liquid
     v.flash *= kFlash; if (v.flash < 0.02) v.flash = 0;
   }
@@ -912,6 +917,24 @@ function frame(ts) {
   if (state.me.ol && !death && self) drawOverleveled(W, H, (view[self.id].x + ox) * zoomCur, (view[self.id].y + oy) * zoomCur, state.me.ol);
   drawHUD(W, H, state.me, self);
   if (death) drawDeathScreen(W, H);
+  else drawPause(W, H);
+}
+// Pause button (top left) and, while paused, a dimmed screen saying who paused it
+function drawPause(W, H) {
+  const { x, y, s } = PAUSE_BTN, hover = onPauseBtn(input.mx, input.my);
+  if (paused) {
+    ctx.fillStyle = 'rgba(0,0,0,0.35)'; ctx.fillRect(0, 0, W, H);
+    label('Paused', W / 2, H * 0.28, 56, 'center');
+    label(`by ${paused.by} — click the button at the top left to resume`, W / 2, H * 0.28 + 40, 18, 'center');
+  }
+  ctx.fillStyle = hover ? 'rgba(0,0,0,0.55)' : 'rgba(0,0,0,0.35)'; roundRect(x, y, s, s, 10); ctx.fill();
+  ctx.fillStyle = '#fff';
+  if (paused) {                                            // play triangle: click to resume
+    ctx.beginPath(); ctx.moveTo(x + s * 0.36, y + s * 0.26); ctx.lineTo(x + s * 0.74, y + s / 2); ctx.lineTo(x + s * 0.36, y + s * 0.74); ctx.closePath(); ctx.fill();
+  } else {                                                 // two bars: click to pause
+    roundRect(x + s * 0.3, y + s * 0.26, s * 0.14, s * 0.48, 2); ctx.fill();
+    roundRect(x + s * 0.56, y + s * 0.26, s * 0.14, s * 0.48, 2); ctx.fill();
+  }
 }
 requestAnimationFrame(frame);
 

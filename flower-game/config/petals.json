@@ -178,8 +178,8 @@
     "reload": 1,
     "radius": 7,
     "trashXp": 200,
-    "color": "#fff7c9",
-    "outline": "#d6cc93",
+    "color": "#ffffff",
+    "outline": "#cfcfcf",
     "count": 3
   },
   "rice": {

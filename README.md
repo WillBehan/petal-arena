@@ -46,6 +46,7 @@ To stop the server, press **Ctrl + C** in the terminal (or close the starter win
 | Delete selected petal | Drag to the red Delete slot | T |
 | Swap the whole loadout with the bench | | X |
 | Stand still while managing petals | Hover the bar at the bottom of the screen | |
+| Pause / resume the game for everyone | Click the button at the top left | |
 
 Quick-delete combos: `Q T T T` deletes three bench petals in a row, and `3 T` sends loadout slot 3 to the bench and deletes it.
 

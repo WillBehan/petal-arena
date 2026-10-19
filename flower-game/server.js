@@ -110,7 +110,7 @@ function spawn(p, start) {
   p.vx = p.vy = p.kx = p.ky = 0; p.poison = null; p.slowUntil = 0;
   p.everSpawned = true;
   p.score = 0; for (let l = 1; l < p.level; l++) p.score += xpForLevel(l);   // points match the level you start at
-  p.immuneUntil = Date.now() / 1000 + S.flower.spawnImmunity;   // mobs ignore you for a moment after spawning
+  p.immuneUntil = gameNow() + S.flower.spawnImmunity;   // mobs ignore you for a moment after spawning
   p.maxHp = maxHpFor(p.level); p.hp = p.maxHp; p.dead = false;
   const n = slotCount(p.level);
   let load, rest;
@@ -145,7 +145,7 @@ function addXp(p, amount) {
     }
   }
 }
-const heal = (p, amt) => { if (!p.dead && !((p.noHealUntil || 0) > Date.now() / 1000)) p.hp = Math.min(p.maxHp, p.hp + amt); };
+const heal = (p, amt) => { if (!p.dead && !((p.noHealUntil || 0) > gameNow())) p.hp = Math.min(p.maxHp, p.hp + amt); };
 
 // Custom start picked on the title screen: level, zone and petals (checked here)
 function readStart(st) {
@@ -281,7 +281,8 @@ const chanceFor = (def, zone) => typeof def.spawnChance === 'object' ? (def.spaw
 // Rare mobs (with their own spawnChance) can still trickle up to the max.
 const popTarget = {};
 function populate() {
-  const now = Date.now() / 1000;
+  if (paused) return;
+  const now = gameNow();
   for (const [type, def] of Object.entries(MOBS)) for (const [zone, range] of Object.entries(def.zones || {})) {
     if (!zoneBounds[zone]) continue;
     const [min, max] = Array.isArray(range) ? range : [range, range];
@@ -348,7 +349,7 @@ function spawnDrops(types, x, y) {
     }
     const id = nextEntityId++;
     drops.set(id, { id, type, x: clamp(px, 20, MAP_W - 20), y: clamp(py, 20, MAP_H - 20), ox: Math.round(x), oy: Math.round(y),
-      expires: Date.now() / 1000 + (S.drops.despawn[PETALS[type].rarity] || 30) });
+      expires: gameNow() + (S.drops.despawn[PETALS[type].rarity] || 30) });
   });
 }
 
@@ -360,7 +361,17 @@ function lockedOnOther(m, attacker) {
   const giveUp = m.cursed ? (cur.viewW || S.view.halfWidth) * 1.3 : def.aggroRange ? def.aggroRange * S.mobs.deaggroFactor : S.mobs.onHitGiveUp;
   return dist2(cur, m) < giveUp ** 2;
 }
-let tickNo = 0;                                  // counts game ticks (used for hit flashes)
+let tickNo = 0;
+// Pause: any player can freeze the whole world for everyone. The game clock stops too, so
+// drops, webs, spawn protection and other timers don't run out while paused.
+let paused = null, pausedMs = 0;
+const gameNow = () => ((paused ? paused.since : Date.now()) - pausedMs) / 1000;
+function setPaused(on, by) {
+  if (on && !paused) paused = { since: Date.now(), by };
+  else if (!on && paused) { pausedMs += Date.now() - paused.since; paused = null; }
+  else return;
+  for (const o of players.values()) send(o, { t: 'pause', on: !!paused, by });
+}                                  // counts game ticks (used for hit flashes)
 // Body damage against other flowers: none until level 9, then it builds up to the full 25
 // (the sheet doesn't know when it's full; here it's at level 14). Against mobs it's always 25.
 function flowerBodyDamage(p) {
@@ -632,8 +643,10 @@ const pairHits = {};
 function pairReady(key, now, cd) { if ((pairHits[key] || 0) > now) return false; pairHits[key] = now + cd; return true; }
 
 function tick() {
-  const now = Date.now() / 1000;
   tickNo++;
+  // Paused: nothing moves; everyone still gets the (frozen) picture a few times a second
+  if (paused) { if (tickNo % 5 === 0) sendState(gameNow()); return; }
+  const now = gameNow();
   const P = S.petals, F = S.flower;
   const live = [...players.values()].filter(p => p.joined && !p.dead);
 
@@ -999,7 +1012,11 @@ function tick() {
     }
   }
 
-  // --- Send each player what's near them ---
+  sendState(now);
+}
+
+// --- Send each player what's near them ---
+function sendState(now) {
   const plist = [...players.values()].filter(p => p.joined).map(p => ({
     id: p.id, n: p.name, x: Math.round(p.x), y: Math.round(p.y), hp: Math.round(p.hp * 10) / 10, mh: p.maxHp,
     l: p.level, s: p.score, d: p.dead ? 1 : 0, f: p.fl === tickNo ? 1 : 0, m: p.input.attack ? 1 : p.input.defend ? 2 : 0,
@@ -1013,7 +1030,7 @@ function tick() {
     const near = e => Math.abs(e.x - p.x) < vw + (e.r || 0) && Math.abs(e.y - p.y) < vh + (e.r || 0);
     send(p, {
       t: 's', players: plist,
-      mobs: ml.filter(m => mobs.has(m.id) && near(m)).map(m => [m.id, m.type, Math.round(m.x), Math.round(m.y), +m.angle.toFixed(2), Math.round(m.hp / m.maxHp * 1000) / 10, Math.round(m.r), m.head ? 1 : 0, m.fl === tickNo ? 1 : 0]),
+      mobs: [...mobs.values()].filter(m => mobs.has(m.id) && near(m)).map(m => [m.id, m.type, Math.round(m.x), Math.round(m.y), +m.angle.toFixed(2), Math.round(m.hp / m.maxHp * 1000) / 10, Math.round(m.r), m.head ? 1 : 0, m.fl === tickNo ? 1 : 0]),
       webs: [...webs.values()].filter(near).map(w => [w.id, Math.round(w.x), Math.round(w.y), w.r]),
       shots: [...projectiles.values()].filter(near).map(s => [s.id, s.type, Math.round(s.x), Math.round(s.y), +Math.atan2(s.vy, s.vx).toFixed(2)]),
       drops: [...drops.values()].filter(near).map(d => [d.id, d.type, Math.round(d.x), Math.round(d.y), Math.round(d.expires - now), d.ox, d.oy]),
@@ -1065,6 +1082,9 @@ wss.on('connection', ws => {
       send(p, { t: 'init', id: p.id, map: { w: MAP_W, h: MAP_H, zones: S.map.zones }, petals: PETALS,
         mobs: Object.fromEntries(Object.entries(MOBS).map(([k, v]) => [k, { stationary: !!v.stationary }])),
         flowerRadius: S.flower.radius, spin: S.petals.spinSpeed, zoom: (S.client || {}).zoom || 1 });
+      if (paused) send(p, { t: 'pause', on: true, by: paused.by });
+    } else if (m.t === 'pause') {
+      setPaused(!paused, p.name);
     } else if (m.t === 'in') {
       p.input.angle = +m.a || 0; p.input.mag = clamp(+m.m || 0, 0, 1);
       p.input.attack = !!m.at; p.input.defend = !!m.df;
@@ -1079,7 +1099,10 @@ wss.on('connection', ws => {
       spawn(p, readStart(m.start));                                   // a custom start saved on the home screen wins
     }
   });
-  ws.on('close', () => players.delete(p.id));
+  ws.on('close', () => {
+    players.delete(p.id);
+    if (paused && ![...players.values()].some(o => o.joined)) setPaused(false);   // everyone left: don't stay frozen
+  });
 });
 
 populate();
