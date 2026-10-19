@@ -256,7 +256,8 @@
     "radius": 17,
     "trashXp": 200,
     "color": "#3d3d3d",
-    "outline": "#232323"
+    "outline": "#232323",
+    "knockbackMul": 1.5
   },
   "iris": {
     "name": "Iris",

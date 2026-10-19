@@ -944,7 +944,7 @@ function tick() {
       if (dist2(q, m) < (def.radius + m.r) ** 2 && pairReady(`q${p.id}_${m.id}_${qi}`, now, P.hitCooldown)) {
         q.hp -= mdef.damage; p.immuneUntil = 0;           // touching a mob ends spawn protection
         if (q.hp <= 0) breakSub(type, q);
-        if (!mdef.stationary) { const d = Math.sqrt(dist2(q, m)) || 1; const kb = S.mobs.knockback * heft(m); m.kx += (m.x - q.x) / d * kb; m.ky += (m.y - q.y) / d * kb; m.cv = (m.cv || 0) * (1 - 0.5 * heft(m)); }
+        if (!mdef.stationary) { const d = Math.sqrt(dist2(q, m)) || 1; const kb = S.mobs.knockback * heft(m) * (def.knockbackMul || 1) /* Heaviest shoves harder */; m.kx += (m.x - q.x) / d * kb; m.ky += (m.y - q.y) / d * kb; m.cv = (m.cv || 0) * (1 - 0.5 * heft(m)); }
         hitFx(def, m, p, now);
         hurt(m, def.damage, p, true);
       }
@@ -976,6 +976,10 @@ function tick() {
       if (!q.alive) return;
       const def = PETALS[type];
       if (dist2(q, b) < (def.radius + F.radius) ** 2 && pairReady(`f${a.id}_${qi}_${b.id}`, now, P.hitCooldown)) {
+        if (def.knockbackMul) {                          // Heaviest: knocks other flowers back too
+          const d = Math.sqrt(dist2(q, b)) || 1, kb = S.mobs.knockback * def.knockbackMul;
+          b.kx += (b.x - q.x) / d * kb; b.ky += (b.y - q.y) / d * kb;
+        }
         hitFx(def, b, a, now);
         hurt(b, def.damage, a, false);
         q.hp -= F.bodyDamage;
