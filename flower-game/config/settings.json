@@ -255,7 +255,10 @@
     "knockbackRefRadius": 24,
     "curseChaseSpeed": 250,
     "pieceDespawn": 60,
-    "chaseKeep": 0.6
+    "chaseKeep": 0.6,
+    "sweepPush": 0.8,
+    "deflectTurn": 0.8,
+    "sidePush": 2
   },
   "view": {
     "halfWidth": 1485,
