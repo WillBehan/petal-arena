@@ -53,11 +53,16 @@ Quick-delete combos: `Q T T T` deletes three bench petals in a row, and `3 T` se
 
 ## Gameplay
 
-- **Zones:** Easy → Medium → Hard → ?, from left to right. Mobs get tougher and drops get rarer as you go.
-- **Overleveled:** you can't stay in a zone once you're above its level cap (15 / 30 / 45). A timer starts, and when it fills your petals disappear.
-- **Leveling:** XP comes from kills and from deleting petals. You get an extra petal slot at levels 15, 30 and 45.
-- **Death:** your 3 best petals drop on the ground for others to grab, and you respawn at level 1.
-- **Rarities:** Common, Unusual, Rare, Epic, Legendary, Unique.
+- **Zones:** Easy → Medium → Hard → ?, from left to right. Mobs get tougher and drops get rarer as you go. You spawn in the zone that fits your level.
+- **Overleveled:** at level 15 / 30 / 45 you're too high for Easy / Medium / Hard. A 45-second timer starts; when it fills, all your petals die. Move to a higher zone and they come back after 2.5 seconds.
+- **Leveling:** XP comes from kills and from deleting petals (Common 2, Unusual 10, Rare 50, Epic 200, Legendary 1000, Unique 2500). The XP needed per level matches the original exactly (level 60 = 22,384 points). You get an extra petal slot at levels 15, 30 and 45.
+- **The curse:** from level 60, every mob on your screen comes after you.
+- **Fighting flowers:** killing a flower gives you half of their points. Body damage against other flowers is 0 until level 9 and builds up to the full 25 by level 14 (against mobs it's always 25). Flowers bounce off each other extra hard.
+- **Poison:** all poison does a steady 9 damage a second until its total is used up (you only flash red once a second).
+- **Death:** your 3 best petals drop on the ground. Each one has a 5% chance not to drop, and then the next best drops instead; a rare-or-better petal that drops has a 1% chance to turn into Pollen. You come back at ¾ of your level with up to 8 petals from your run (each remaining petal has a 10% chance to be lost). The home screen shows what you'll respawn with.
+- **Spawn protection:** for 5 seconds after spawning, mobs ignore you (until you touch one).
+- **Custom start:** the title screen's *Custom start* button lets you pick a level, zone and petals. Press Save and it's used for your next spawn (also after dying); the title screen shows what you'll spawn with.
+- **Rarities:** Common, Unusual, Rare, Epic, Legendary, Unique. Only one of each Unique petal (Square, Unique Basic) can exist on the server at a time.
 
 The title screen has **Mobs** and **Petals** tabs listing everything currently in the game, including drop chances.
 
@@ -65,13 +70,15 @@ The title screen has **Mobs** and **Petals** tabs listing everything currently i
 | Zone | Mobs |
 |---|---|
 | Easy | Ladybug, Bee, Rock, Boulder, Baby Ant, Worker Ant (right half), Centipede, Massive Ladybug (rare) |
-| Medium | Easy mobs (no rocks) plus Cactus, Yellow Ladybug, Worker Ant; Beetle, Evil Centipede, Ant Hole and Massive Beetle in the right half |
-| Hard | Spider, Hornet (right half), Soldier Ant, Beetle, Boulder, Ant Hole, Massive Beetle, Evil Centipede, Bee, Ladybug, Centipede, ants |
+| Medium | Ladybug, Bee, Cactus, Baby/Worker/Soldier Ants, Centipede, Yellow Ladybug; Beetle, Ant Hole, Massive Beetle and Evil Centipede in the right half |
+| Hard | Spider, Hornet (right half), Beetle, Boulder, Ladybug (left half), Baby/Worker/Soldier Ants, Centipede, Ant Hole, Massive Beetle, Evil Centipede |
+| ? | Dark Ladybug, Spider, Hornet, Beetle, Boulder, ants, Centipede, Ant Hole, Massive Beetle, Evil Centipede |
+| Anywhere | Square (unique, extremely rare: it drops the Square petal) |
 
-Ant Holes release 5 Baby, 8 Worker and 25 Soldier Ants as they take damage, plus a Queen Ant at low health.
+Stats, drop chances, aggro ranges (12 units for Beetle, Hornet and Spider, 6 for Soldier Ants) and chase acceleration follow the Florr.io stat sheet. Ant Holes release 5 Baby Ants first, then a mix of 8 Worker and Soldier Ants, then only Soldier Ants (26 in all) as they take damage, plus a Queen Ant at 100 health. Now and then a Centipede or Evil Centipede spawns "massive", with 51 segments. Hornets shoot every 2 seconds; some shots lead your movement.
 
 ### Petal abilities
-Poison (Iris, Peas), healing (Rose, Leaf), projectiles (Peas, Missile, Dandelion, Web), Bubble launch, Wing swing, Honey slow, Salt damage reflect, Faster spin, Cactus max health, Egg pets, Web slow zones, Antennae extra vision, and multi-petals (Twin, Triplet).
+Poison (Iris, Iris Missile, Epic/Legendary Peas, Epic Cactus), healing (Rose, Leaf), projectiles (Peas, Missile, Dandelion, Web), Pollen ground traps (left click throws them far, right click drops a clump), Yin Yang (1 reverses your spin, 2 stop it, all 8 spin much faster), Bubble launch (several bubbles add up), Wing swing, Honey slow (stacks), Salt damage reflect, Faster spin, Cactus max health, Egg pets (they go for flowers first), Web slow zones (overlapping webs multiply; Triple Web lands 3 webs side by side), Antennae extra vision, and multi-petals (Twin, Triplet, Pollen, triple Rose/Cactus/Stinger/Web).
 
 ---
 
@@ -82,7 +89,7 @@ Most of the game is plain JSON in the `config/` folder, so you can change it wit
 | File | What's in it |
 |---|---|
 | `config/settings.json` | Flower speed and health, map and zone sizes, XP multiplier, petal orbit, mob behavior, drop timers, zoom |
-| `config/mobs.json` | Every mob: health, damage, XP, size, speed, aggro range, chase speed, which zones it spawns in (min–max counts) and its drop table |
+| `config/mobs.json` | Every mob: health, damage, XP, size, speed, aggro range, chase acceleration, which zones it spawns in (min–max counts) and its drop table |
 | `config/petals.json` | Every petal: rarity, damage, health, reload, color and special ability |
 
 **Example: add a custom petal.** Add an entry to `petals.json`:
@@ -104,8 +111,9 @@ Then make a mob drop it, for example in `mobs.json` under `"bee"` → `"drops"`,
 flower-game/
 ├── server.js            # Game server: world simulation, mobs, combat, multiplayer
 ├── public/
-│   ├── index.html       # Title screen
-│   └── client.js        # Rendering, animation, controls, inventory UI
+│   ├── index.html       # Title screen, custom start menu
+│   ├── client.js        # Rendering, animation, controls, inventory UI
+│   └── fonts/           # Ubuntu Bold (petal and level-bar lettering)
 ├── config/
 │   ├── settings.json
 │   ├── mobs.json
@@ -122,7 +130,7 @@ flower-game/
 ## Roadmap
 
 - [x] Easy, Medium and Hard zones
-- [ ] "?" zone (Dark Ladybug, Yin Yang)
+- [x] "?" zone (Dark Ladybug, Yin Yang)
 - [ ] Saved progress between sessions
 - [ ] Bots
 - [ ] Online hosting so friends can join from anywhere
