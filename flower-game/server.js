@@ -270,9 +270,10 @@ function spotFree(x, y, r) {
 // bigger ones less by their size squared - a Massive Ladybug barely moves
 const heft = m => Math.min(1, (S.mobs.knockbackRefRadius / m.r) ** 2);
 // A petal hitting a mob shoves it away from the hit, and also along the way the petal was
-// sweeping (petals spin round the flower), so a hit on a mob's side knocks it sideways. A side
-// hit also turns the mob a little off course, so a chasing mob has to turn back towards you.
-// Big mobs get shoved and turned less; Heaviest shoves harder.
+// sweeping (petals spin round the flower). The push straight back is a quick knock, like before;
+// the sideways part is a smooth slide that eases to a stop, so a mob hit on its side glides over
+// to a new spot instead of twitching (it doesn't spin round or snap back). Big mobs move less;
+// Heaviest shoves harder.
 function petalShove(p, q, m, def) {
   const d = Math.sqrt(dist2(q, m)) || 1, rx = (m.x - q.x) / d, ry = (m.y - q.y) / d;
   const pa = Math.atan2(q.y - p.y, q.x - p.x), w = S.petals.spinSpeed * (p.spin || 0), pr = Math.hypot(q.x - p.x, q.y - p.y);
@@ -281,15 +282,11 @@ function petalShove(p, q, m, def) {
   let px = rx + (sw ? vx / vs * sw : 0), py = ry + (sw ? vy / vs * sw : 0);
   const pl = Math.hypot(px, py) || 1; px /= pl; py /= pl;
   const h = heft(m), kb = S.mobs.knockback * h * (def.knockbackMul || 1);
-  // the sideways part of the shove (across the way the mob is facing) is stronger
   const fx = Math.cos(m.angle), fy = Math.sin(m.angle), along = px * fx + py * fy;
-  const sx = px - along * fx, sy = py - along * fy;
-  m.kx += (along * fx + sx * S.mobs.sidePush) * kb; m.ky += (along * fy + sy * S.mobs.sidePush) * kb;
+  m.kx += along * fx * kb; m.ky += along * fy * kb;                       // quick knock back/forward
+  const slide = kb * S.mobs.sidePush * S.mobs.slideDecay / KB_DECAY;      // same distance as a knock x sidePush
+  m.sx = (m.sx || 0) + (px - along * fx) * slide; m.sy = (m.sy || 0) + (py - along * fy) * slide;
   m.cv = (m.cv || 0) * (1 - 0.5 * h);
-  if (!m.leader) {                                     // (attached centipede segments just follow)
-    const turn = Math.sin(angDiff(m.angle, Math.atan2(py, px))) * S.mobs.deflectTurn * h * (def.knockbackMul || 1);
-    m.angle += turn; m.heading = (m.heading ?? m.angle) + turn;
-  }
 }
 const ANTS = new Set(['babyAnt', 'workerAnt', 'soldierAnt', 'queenAnt']);
 function antHoleRelease(h, attacker) {
@@ -657,6 +654,14 @@ function movePet(m, def) {
   m.x = clamp(m.x + Math.cos(a) * spd * DT + m.kx * DT, m.r, MAP_W - m.r);
   m.y = clamp(m.y + Math.sin(a) * spd * DT + m.ky * DT, m.r, MAP_H - m.r);
   const kd = Math.exp(-KB_DECAY * DT); m.kx *= kd; m.ky *= kd;
+  slideMob(m);
+}
+// Sideways slide from a petal hit: glides and eases to a stop
+function slideMob(m) {
+  if (!m.sx && !m.sy) return;
+  m.x = clamp(m.x + m.sx * DT, m.r, MAP_W - m.r); m.y = clamp(m.y + m.sy * DT, m.r, MAP_H - m.r);
+  const sd = Math.exp(-S.mobs.slideDecay * DT); m.sx *= sd; m.sy *= sd;
+  if (Math.abs(m.sx) + Math.abs(m.sy) < 0.5) m.sx = m.sy = 0;
 }
 function petFights(now) {
   for (const m of [...mobs.values()]) {
@@ -934,6 +939,7 @@ function tick() {
     const kd = Math.exp(-KB_DECAY * DT);
     m.x = clamp(m.x + m.kx * DT, m.r, MAP_W - m.r); m.y = clamp(m.y + m.ky * DT, m.r, MAP_H - m.r);
     m.kx *= kd; m.ky *= kd;
+    slideMob(m);
   }
   // Mobs gently push apart (not segments of the same centipede)
   buildGrid();
