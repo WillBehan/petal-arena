@@ -269,25 +269,6 @@ function spotFree(x, y, r) {
 // How easily a mob gets shoved: small mobs (ant-sized and below) take the full push,
 // bigger ones less by their size squared - a Massive Ladybug barely moves
 const heft = m => Math.min(1, (S.mobs.knockbackRefRadius / m.r) ** 2);
-// A petal hitting a mob shoves it away from the hit, and also along the way the petal was
-// sweeping (petals spin round the flower). The push straight back is a quick knock, like before;
-// the sideways part is a smooth slide that eases to a stop, so a mob hit on its side glides over
-// to a new spot instead of twitching (it doesn't spin round or snap back). Big mobs move less;
-// Heaviest shoves harder.
-function petalShove(p, q, m, def) {
-  const d = Math.sqrt(dist2(q, m)) || 1, rx = (m.x - q.x) / d, ry = (m.y - q.y) / d;
-  const pa = Math.atan2(q.y - p.y, q.x - p.x), w = S.petals.spinSpeed * (p.spin || 0), pr = Math.hypot(q.x - p.x, q.y - p.y);
-  const vx = -Math.sin(pa) * w * pr + (p.vx || 0), vy = Math.cos(pa) * w * pr + (p.vy || 0), vs = Math.hypot(vx, vy);
-  const sw = vs > 1 ? S.mobs.sweepPush * Math.min(1, vs / 300) : 0;
-  let px = rx + (sw ? vx / vs * sw : 0), py = ry + (sw ? vy / vs * sw : 0);
-  const pl = Math.hypot(px, py) || 1; px /= pl; py /= pl;
-  const h = heft(m), kb = S.mobs.knockback * h * (def.knockbackMul || 1);
-  const fx = Math.cos(m.angle), fy = Math.sin(m.angle), along = px * fx + py * fy;
-  m.kx += along * fx * kb; m.ky += along * fy * kb;                       // quick knock back/forward
-  const slide = kb * S.mobs.sidePush * S.mobs.slideDecay / KB_DECAY;      // same distance as a knock x sidePush
-  m.sx = (m.sx || 0) + (px - along * fx) * slide; m.sy = (m.sy || 0) + (py - along * fy) * slide;
-  m.cv = (m.cv || 0) * (1 - 0.5 * h);
-}
 const ANTS = new Set(['babyAnt', 'workerAnt', 'soldierAnt', 'queenAnt']);
 function antHoleRelease(h, attacker) {
   const def = MOBS[h.type], frac = 1 - Math.max(0, h.hp) / h.maxHp;
@@ -654,14 +635,6 @@ function movePet(m, def) {
   m.x = clamp(m.x + Math.cos(a) * spd * DT + m.kx * DT, m.r, MAP_W - m.r);
   m.y = clamp(m.y + Math.sin(a) * spd * DT + m.ky * DT, m.r, MAP_H - m.r);
   const kd = Math.exp(-KB_DECAY * DT); m.kx *= kd; m.ky *= kd;
-  slideMob(m);
-}
-// Sideways slide from a petal hit: glides and eases to a stop
-function slideMob(m) {
-  if (!m.sx && !m.sy) return;
-  m.x = clamp(m.x + m.sx * DT, m.r, MAP_W - m.r); m.y = clamp(m.y + m.sy * DT, m.r, MAP_H - m.r);
-  const sd = Math.exp(-S.mobs.slideDecay * DT); m.sx *= sd; m.sy *= sd;
-  if (Math.abs(m.sx) + Math.abs(m.sy) < 0.5) m.sx = m.sy = 0;
 }
 function petFights(now) {
   for (const m of [...mobs.values()]) {
@@ -939,7 +912,6 @@ function tick() {
     const kd = Math.exp(-KB_DECAY * DT);
     m.x = clamp(m.x + m.kx * DT, m.r, MAP_W - m.r); m.y = clamp(m.y + m.ky * DT, m.r, MAP_H - m.r);
     m.kx *= kd; m.ky *= kd;
-    slideMob(m);
   }
   // Mobs gently push apart (not segments of the same centipede)
   buildGrid();
@@ -972,7 +944,7 @@ function tick() {
       if (dist2(q, m) < (def.radius + m.r) ** 2 && pairReady(`q${p.id}_${m.id}_${qi}`, now, P.hitCooldown)) {
         q.hp -= mdef.damage; p.immuneUntil = 0;           // touching a mob ends spawn protection
         if (q.hp <= 0) breakSub(type, q);
-        if (!mdef.stationary) petalShove(p, q, m, def);
+        if (!mdef.stationary) { const d = Math.sqrt(dist2(q, m)) || 1; const kb = S.mobs.knockback * heft(m) * (def.knockbackMul || 1) /* Heaviest shoves harder */; m.kx += (m.x - q.x) / d * kb; m.ky += (m.y - q.y) / d * kb; m.cv = (m.cv || 0) * (1 - 0.5 * heft(m)); }
         hitFx(def, m, p, now);
         hurt(m, def.damage, p, true);
       }
