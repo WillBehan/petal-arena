@@ -459,6 +459,10 @@ module.exports = function createBots(api) {
     } else if (threats.length) {
       b.mode = 'fight'; b.target = threats.sort((x, y) => dist(x, p) - dist(y, p))[0];
       b.kite = threats.length > sk.pull ? threats : null;               // too many: fight while backing off
+    } else if ((b.prize = prizeDrop(p, near))) {
+      // Something good on the ground (like the petals a flower drops when it dies): go get it,
+      // even mid healing break - Roses keep working on the way
+      b.mode = 'loot'; b.goto = { x: b.prize.x, y: b.prize.y };
     } else if (b.healing && inZone && !p.overleveled) {
       b.mode = 'heal';
       // drift away from nearby mobs while Roses/Leaves do their work
@@ -551,6 +555,21 @@ module.exports = function createBots(api) {
 
     // Steering wobble (worse players wobble more)
     b.noise = clamp(b.noise + rand(-1, 1) * sk.angNoise, -sk.angNoise * 2, sk.angNoise * 2);
+  }
+
+  // The best rare-or-better drop within reach (worth walking further for), if it has room
+  function prizeDrop(p, near) {
+    const free = p.petals.includes(null) || p.bench.includes(null) || p.bench.some(t => t && PETALS[t].rarity !== 'legendary' && PETALS[t].rarity !== 'unique');
+    if (!free) return null;
+    let best = null, bv = 0;
+    for (const d of drops.values()) {
+      const r = RANK[PETALS[d.type].rarity]; if (r < RANK.rare) continue;
+      const dd = dist(d, p); if (dd > 1500) continue;
+      if (near.some(m => MOBS[m.type].stationary && dist(m, d) < m.r + 40)) continue;
+      const v = (r + 1) / (1 + dd / 500);
+      if (v > bv) { bv = v; best = d; }
+    }
+    return best;
   }
 
   // Bubble escape: pop when a Bubble is between the bot and what's chasing it
