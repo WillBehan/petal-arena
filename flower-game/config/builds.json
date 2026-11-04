@@ -1,0 +1,835 @@
+{
+  "_help": [
+    "Builds the bots work towards. Each slot names a petal FAMILY (see 'families' below).",
+    "A family lists the real petals best-first (e.g. 'stinger' = Legendary Stinger, then Stinger).",
+    "'standIns' are what a bot uses in that slot until it gets the real thing.",
+    "Goal builds: 'weight' = how often bots pick it (higher = more popular / better ranked).",
+    "'heal': 'equipped' = healing stays in the loadout; 'bench' = Roses wait on the bench and get swapped in to heal.",
+    "'stepping' = an easier build to play while collecting the pieces for a hard-to-get goal.",
+    "'tactic': special move - 'bubble' (Bubble-dash away from danger), 'web' (drop webs while farming).",
+    "'style': how the build leans - 'kill', 'lean-kill', 'hybrid', 'lean-farm' or 'farm'. Bots pick builds that match how aggressive they are (aggressive -> kill, calm -> farm, in between -> hybrid)."
+  ],
+  "families": {
+    "rose": {
+      "petals": [
+        "roseEpic",
+        "roseRare",
+        "rose"
+      ],
+      "standIns": [
+        "leaf"
+      ],
+      "heal": true
+    },
+    "roseRare": {
+      "petals": [
+        "roseEpic",
+        "roseRare"
+      ],
+      "standIns": [
+        "rose",
+        "leaf"
+      ],
+      "heal": true
+    },
+    "roseEpic": {
+      "petals": [
+        "roseEpic"
+      ],
+      "standIns": [
+        "roseRare",
+        "rose",
+        "leaf"
+      ],
+      "heal": true
+    },
+    "leaf": {
+      "petals": [
+        "leaf"
+      ],
+      "standIns": [
+        "rose",
+        "roseRare"
+      ],
+      "heal": true
+    },
+    "roseOrYY": {
+      "petals": [
+        "yinYang",
+        "roseEpic",
+        "roseRare",
+        "rose"
+      ],
+      "standIns": [
+        "leaf"
+      ],
+      "heal": true
+    },
+    "stinger": {
+      "petals": [
+        "stingerLegendary",
+        "stinger"
+      ],
+      "standIns": [
+        "heavy",
+        "twin",
+        "fast"
+      ]
+    },
+    "stingerL": {
+      "petals": [
+        "stingerLegendary"
+      ],
+      "standIns": [
+        "stinger",
+        "heavy"
+      ]
+    },
+    "faster": {
+      "petals": [
+        "faster"
+      ],
+      "standIns": [
+        "fast",
+        "twin"
+      ]
+    },
+    "triplet": {
+      "petals": [
+        "triplet"
+      ],
+      "standIns": [
+        "twin",
+        "fast"
+      ]
+    },
+    "pollen": {
+      "petals": [
+        "pollen"
+      ],
+      "standIns": [
+        "triplet",
+        "twin",
+        "fast"
+      ]
+    },
+    "tripPollen": {
+      "petals": [
+        "triplet",
+        "pollen"
+      ],
+      "standIns": [
+        "twin",
+        "fast"
+      ]
+    },
+    "twin": {
+      "petals": [
+        "triplet",
+        "twin"
+      ],
+      "standIns": [
+        "fast"
+      ]
+    },
+    "heavy": {
+      "petals": [
+        "heaviest",
+        "rock",
+        "heavy"
+      ],
+      "standIns": [
+        "stinger"
+      ]
+    },
+    "rock": {
+      "petals": [
+        "heaviest",
+        "rock"
+      ],
+      "standIns": [
+        "heavy"
+      ]
+    },
+    "iris": {
+      "petals": [
+        "iris"
+      ],
+      "standIns": [
+        "stinger",
+        "heavy"
+      ]
+    },
+    "wing": {
+      "petals": [
+        "wing"
+      ],
+      "standIns": [
+        "heavy",
+        "stinger"
+      ]
+    },
+    "bubble": {
+      "petals": [
+        "bubble"
+      ],
+      "standIns": [
+        "rose",
+        "fast"
+      ]
+    },
+    "salt": {
+      "petals": [
+        "salt"
+      ],
+      "standIns": [
+        "cactusRare",
+        "heavy"
+      ]
+    },
+    "honey": {
+      "petals": [
+        "honey"
+      ],
+      "standIns": [
+        "heavy",
+        "iris"
+      ]
+    },
+    "dandelion": {
+      "petals": [
+        "dandelion"
+      ],
+      "standIns": [
+        "iris",
+        "stinger"
+      ]
+    },
+    "web": {
+      "petals": [
+        "webLegendary",
+        "web"
+      ],
+      "standIns": [
+        "iris",
+        "stinger",
+        "heavy"
+      ]
+    },
+    "egg": {
+      "petals": [
+        "eggLegendary",
+        "egg"
+      ],
+      "standIns": [
+        "heavy",
+        "wing"
+      ]
+    },
+    "missile": {
+      "petals": [
+        "irisMissile",
+        "missile"
+      ],
+      "standIns": [
+        "stinger",
+        "heavy"
+      ]
+    },
+    "cactus": {
+      "petals": [
+        "cactusLegendary",
+        "cactusEpic",
+        "cactusRare"
+      ],
+      "standIns": [
+        "iris",
+        "heavy"
+      ]
+    },
+    "cactusEpic": {
+      "petals": [
+        "cactusLegendary",
+        "cactusEpic"
+      ],
+      "standIns": [
+        "cactusRare",
+        "iris",
+        "heavy"
+      ]
+    },
+    "peas": {
+      "petals": [
+        "peasLegendary",
+        "peasEpic",
+        "peas"
+      ],
+      "standIns": [
+        "twin",
+        "fast"
+      ]
+    },
+    "peasL": {
+      "petals": [
+        "peasLegendary"
+      ],
+      "standIns": [
+        "peasEpic",
+        "peas",
+        "twin"
+      ]
+    },
+    "yinYang": {
+      "petals": [
+        "yinYang"
+      ],
+      "standIns": [
+        "heavy"
+      ]
+    }
+  },
+  "steppingStones": {
+    "Starter": {
+      "slots": [
+        "rose",
+        "heavy",
+        "rose",
+        "heavy",
+        "heavy",
+        "stinger",
+        "twin",
+        "twin"
+      ]
+    },
+    "Killing Strat": {
+      "slots": [
+        "rose",
+        "stinger",
+        "iris",
+        "rose",
+        "stinger",
+        "stinger",
+        "twin",
+        "heavy"
+      ]
+    },
+    "Wing Faster": {
+      "slots": [
+        "wing",
+        "faster",
+        "rose",
+        "wing",
+        "faster",
+        "rose",
+        "wing",
+        "faster"
+      ]
+    },
+    "Twin Faster": {
+      "slots": [
+        "twin",
+        "faster",
+        "rose",
+        "twin",
+        "faster",
+        "rose",
+        "twin",
+        "faster"
+      ]
+    },
+    "Stinger Faster": {
+      "slots": [
+        "stinger",
+        "faster",
+        "rose",
+        "stinger",
+        "faster",
+        "rose",
+        "stinger",
+        "faster"
+      ]
+    },
+    "Rock Wing Faster": {
+      "slots": [
+        "rock",
+        "wing",
+        "faster",
+        "rose",
+        "rock",
+        "wing",
+        "faster",
+        "rose"
+      ]
+    },
+    "Peas Strat": {
+      "slots": [
+        "peas",
+        "rose",
+        "peas",
+        "peas",
+        "rose",
+        "peas",
+        "twin",
+        "twin"
+      ]
+    }
+  },
+  "goals": {
+    "The Arsenal": {
+      "weight": 10,
+      "style": "lean-kill",
+      "slots": [
+        "bubble",
+        "bubble",
+        "rock",
+        "stinger",
+        "dandelion",
+        "iris",
+        "stinger",
+        "rock"
+      ],
+      "heal": "bench",
+      "bench": [
+        "faster"
+      ],
+      "tactic": "bubble"
+    },
+    "The Quick-Ripper": {
+      "weight": 10,
+      "style": "kill",
+      "slots": [
+        "stinger",
+        "stinger",
+        "stinger",
+        "faster",
+        "faster",
+        "stinger",
+        "stinger",
+        "stinger"
+      ],
+      "heal": "bench"
+    },
+    "The Antiteamer": {
+      "weight": 9,
+      "style": "kill",
+      "slots": [
+        "roseRare",
+        "roseRare",
+        "faster",
+        "faster",
+        "stinger",
+        "stinger",
+        "iris",
+        "stinger"
+      ]
+    },
+    "Square Hunter": {
+      "weight": 9,
+      "style": "lean-kill",
+      "slots": [
+        "faster",
+        "faster",
+        "rose",
+        "rose",
+        "wing",
+        "wing",
+        "wing",
+        "stingerL"
+      ],
+      "stepping": "Wing Faster"
+    },
+    "The Death Wheel": {
+      "weight": 8,
+      "style": "hybrid",
+      "slots": [
+        "faster",
+        "triplet",
+        "faster",
+        "triplet",
+        "twin",
+        "triplet",
+        "rose",
+        "rose"
+      ],
+      "stepping": "Twin Faster"
+    },
+    "The Virus": {
+      "weight": 8,
+      "style": "hybrid",
+      "slots": [
+        "iris",
+        "twin",
+        "triplet",
+        "faster",
+        "pollen",
+        "bubble",
+        "rose",
+        "rose"
+      ],
+      "stepping": "Twin Faster",
+      "tactic": "bubble"
+    },
+    "The Yellowjacket": {
+      "weight": 8,
+      "style": "lean-kill",
+      "slots": [
+        "cactusEpic",
+        "stinger",
+        "stinger",
+        "stinger",
+        "faster",
+        "rose",
+        "rose",
+        "stinger"
+      ],
+      "bench": [
+        "bubble"
+      ],
+      "stepping": "Killing Strat"
+    },
+    "The Spider": {
+      "weight": 7,
+      "style": "lean-farm",
+      "slots": [
+        "web",
+        "web",
+        "web",
+        "stinger",
+        "stinger",
+        "stinger",
+        "rose",
+        "rose"
+      ],
+      "tactic": "web"
+    },
+    "The Catalyst": {
+      "weight": 7,
+      "style": "lean-kill",
+      "slots": [
+        "rose",
+        "iris",
+        "stinger",
+        "rose",
+        "iris",
+        "stinger",
+        "stinger",
+        "iris"
+      ]
+    },
+    "Leafy Anvil": {
+      "weight": 7,
+      "style": "farm",
+      "slots": [
+        "leaf",
+        "leaf",
+        "faster",
+        "faster",
+        "leaf",
+        "leaf",
+        "rock",
+        "rock"
+      ]
+    },
+    "The Leaf-blower": {
+      "weight": 6,
+      "style": "farm",
+      "slots": [
+        "leaf",
+        "faster",
+        "leaf",
+        "faster",
+        "leaf",
+        "faster",
+        "leaf",
+        "faster"
+      ]
+    },
+    "Leaf Blade": {
+      "weight": 6,
+      "style": "lean-kill",
+      "slots": [
+        "stinger",
+        "leaf",
+        "stinger",
+        "faster",
+        "stinger",
+        "leaf",
+        "stinger",
+        "faster"
+      ]
+    },
+    "The Smasher": {
+      "weight": 6,
+      "style": "lean-kill",
+      "slots": [
+        "egg",
+        "pollen",
+        "bubble",
+        "pollen",
+        "egg",
+        "stingerL",
+        "cactusEpic",
+        "stingerL"
+      ],
+      "heal": "bench",
+      "stepping": "Wing Faster",
+      "tactic": "bubble"
+    },
+    "Salt n' Pepper": {
+      "weight": 6,
+      "style": "kill",
+      "slots": [
+        "rose",
+        "bubble",
+        "salt",
+        "stinger",
+        "stinger",
+        "iris",
+        "stinger",
+        "rose"
+      ],
+      "tactic": "bubble"
+    },
+    "The Pushpin": {
+      "weight": 5,
+      "style": "kill",
+      "slots": [
+        "tripPollen",
+        "tripPollen",
+        "bubble",
+        "bubble",
+        "tripPollen",
+        "tripPollen",
+        "stingerL",
+        "stingerL"
+      ],
+      "heal": "bench",
+      "stepping": "Stinger Faster",
+      "tactic": "bubble"
+    },
+    "The Wasp": {
+      "weight": 5,
+      "style": "hybrid",
+      "slots": [
+        "stinger",
+        "stinger",
+        "stinger",
+        "twin",
+        "twin",
+        "rose",
+        "rose",
+        "stinger"
+      ]
+    },
+    "The Killer Whale": {
+      "weight": 5,
+      "style": "kill",
+      "slots": [
+        "stinger",
+        "triplet",
+        "stinger",
+        "triplet",
+        "stinger",
+        "triplet",
+        "stinger",
+        "roseEpic"
+      ],
+      "stepping": "Stinger Faster"
+    },
+    "Toxic Dagger": {
+      "weight": 4,
+      "style": "kill",
+      "slots": [
+        "roseEpic",
+        "roseEpic",
+        "faster",
+        "faster",
+        "triplet",
+        "triplet",
+        "stinger",
+        "iris"
+      ],
+      "stepping": "Twin Faster"
+    },
+    "Instant Killing": {
+      "weight": 4,
+      "style": "farm",
+      "slots": [
+        "triplet",
+        "triplet",
+        "triplet",
+        "triplet",
+        "triplet",
+        "triplet",
+        "roseEpic",
+        "roseEpic"
+      ],
+      "stepping": "Twin Faster"
+    },
+    "Bubble Missile": {
+      "weight": 4,
+      "style": "lean-kill",
+      "slots": [
+        "bubble",
+        "missile",
+        "missile",
+        "missile",
+        "missile",
+        "missile",
+        "rose",
+        "rose"
+      ],
+      "stepping": "Killing Strat",
+      "tactic": "bubble"
+    },
+    "Honey Wing Faster": {
+      "weight": 7,
+      "style": "hybrid",
+      "slots": [
+        "rose",
+        "faster",
+        "wing",
+        "honey",
+        "faster",
+        "wing",
+        "honey",
+        "rose"
+      ],
+      "stepping": "Wing Faster"
+    },
+    "The Ruined Liberty": {
+      "weight": 6,
+      "style": "lean-kill",
+      "slots": [
+        "salt",
+        "cactus",
+        "cactus",
+        "rose",
+        "cactus",
+        "cactus",
+        "cactus",
+        "rose"
+      ]
+    },
+    "Rock Ram": {
+      "weight": 6,
+      "style": "lean-kill",
+      "slots": [
+        "rose",
+        "salt",
+        "bubble",
+        "rock",
+        "rock",
+        "rock",
+        "rock",
+        "rose"
+      ],
+      "tactic": "bubble"
+    },
+    "Yin Yang Bubble Assassin": {
+      "weight": 5,
+      "style": "kill",
+      "slots": [
+        "rose",
+        "bubble",
+        "roseOrYY",
+        "iris",
+        "stinger",
+        "dandelion",
+        "iris",
+        "stinger"
+      ],
+      "stepping": "Killing Strat",
+      "tactic": "bubble"
+    },
+    "Rock Faster": {
+      "weight": 6,
+      "style": "lean-farm",
+      "slots": [
+        "rock",
+        "faster",
+        "rock",
+        "faster",
+        "rose",
+        "rock",
+        "faster",
+        "rose"
+      ],
+      "stepping": "Rock Wing Faster"
+    },
+    "Cactus Honey No Heal": {
+      "weight": 4,
+      "style": "lean-farm",
+      "slots": [
+        "cactus",
+        "honey",
+        "cactus",
+        "honey",
+        "cactus",
+        "honey",
+        "cactus",
+        "honey"
+      ],
+      "heal": "bench"
+    },
+    "Heavyzzz": {
+      "weight": 5,
+      "style": "lean-farm",
+      "slots": [
+        "heavy",
+        "heavy",
+        "rose",
+        "heavy",
+        "heavy",
+        "heavy",
+        "rose",
+        "heavy"
+      ]
+    },
+    "Dandy Iris Web": {
+      "weight": 5,
+      "style": "hybrid",
+      "slots": [
+        "dandelion",
+        "iris",
+        "web",
+        "rose",
+        "dandelion",
+        "iris",
+        "web",
+        "rose"
+      ],
+      "tactic": "web"
+    },
+    "Pea Shooter": {
+      "weight": 3,
+      "style": "lean-farm",
+      "slots": [
+        "peasL",
+        "cactus",
+        "peasL",
+        "rose",
+        "peasL",
+        "cactus",
+        "peasL",
+        "rose"
+      ],
+      "stepping": "Peas Strat"
+    },
+    "Long Run Combo": {
+      "weight": 2,
+      "style": "hybrid",
+      "slots": [
+        "stingerL",
+        "peasL",
+        "cactus",
+        "roseEpic",
+        "stingerL",
+        "peasL",
+        "cactus",
+        "roseEpic"
+      ],
+      "stepping": "Stinger Faster"
+    }
+  }
+}

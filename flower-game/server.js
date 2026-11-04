@@ -107,7 +107,7 @@ function spawn(p, start) {
     if (gap >= S.flower.spawnClearance) break;
   }
   p.x = best.x; p.y = best.y;
-  p.vx = p.vy = p.kx = p.ky = 0; p.poison = null; p.slowUntil = 0;
+  p.vx = p.vy = p.kx = p.ky = 0; p.poison = null; p.slowUntil = 0; p.olT = 0;
   p.everSpawned = true;
   p.score = 0; for (let l = 1; l < p.level; l++) p.score += xpForLevel(l);   // points match the level you start at
   p.immuneUntil = gameNow() + S.flower.spawnImmunity;   // mobs ignore you for a moment after spawning
@@ -116,10 +116,9 @@ function spawn(p, start) {
   let load, rest;
   if (start) { load = start.petals.slice(0, n); rest = start.bench; }
   else { const keep = p.keep || []; load = keep.slice(0, n); rest = keep.slice(n); }   // kept petals go in the loadout
-  const fresh = !start && wasDead;     // after a death empty slots stay empty (no Basics)
   p.petals = [];
   const filler = i => (!start && S.flower.startingPetals[i]) || 'basic';
-  for (let i = 0; i < n; i++) p.petals.push(load[i] ? makeSlot(load[i], false) : fresh ? null : makeSlot(filler(i), false));
+  for (let i = 0; i < n; i++) p.petals.push(load[i] ? makeSlot(load[i], false) : makeSlot(filler(i), false));   // empty slots get a Basic (also after a death)
   p.bench = Array(S.flower.benchSlots).fill(null);
   rest.filter(Boolean).slice(0, p.bench.length).forEach((t, i) => p.bench[i] = t);
   // Unique petals: keep only one, and none if someone else already has it
@@ -419,8 +418,9 @@ function hurt(target, amount, attacker, isMob, noReflect = false, quiet = false)
     return;
   }
   if (target.dead) return;
+  if (target.bot && attacker && attacker.ws && !attacker.bot) { target.brain.hitBy = attacker.id; target.brain.hitAt = gameNow(); }
   // Salt: a flower hurting you takes part of that damage back (doesn't bounce back and forth)
-  if (!noReflect && target.salt && attacker && attacker.ws && attacker !== target) hurt(attacker, amount * target.salt, target, false, true);
+  if (!noReflect && target.salt && !(target.bot && attacker && attacker.bot) && attacker && attacker.ws && attacker !== target) hurt(attacker, amount * target.salt, target, false, true);
   target.hp -= amount;
   if (target.hp <= 0) {
     if (attacker && attacker.ws && attacker !== target) {
@@ -503,7 +503,7 @@ function tickProjectiles(live, now) {
     const owner = players.get(s.owner), def = PETALS[s.type];
     let hit = null, isMob = false;
     for (const m of nearMobs(s.x, s.y, s.r)) if (!(m.owner === s.owner) && dist2(s, m) < (s.r + m.r) ** 2) { hit = m; isMob = true; break; }
-    if (!hit) for (const p of live) if (p.id !== s.owner && !p.dead && dist2(s, p) < (s.r + S.flower.radius) ** 2) { hit = p; break; }
+    if (!hit) for (const p of live) if (p.id !== s.owner && !(owner && owner.bot && p.bot) && !p.dead && dist2(s, p) < (s.r + S.flower.radius) ** 2) { hit = p; break; }
     if (!hit) continue;
     hitFx({ ...def, poison: s.poison }, hit, owner, now);   // a shot carries its own poison (each pea's)
     if (def.noHeal && !isMob) hit.noHealUntil = now + def.noHeal;      // Dandelion
@@ -531,7 +531,7 @@ function webSlow(e, isMob) {
   if (isMob && MOBS[e.type].webImmune) return 1;
   // Overlapping webs multiply: 1 web = -75%, 2 webs = -93.75%
   let f = 1;
-  for (const w of webs.values()) if (w.owner !== e.id && (e.x - w.x) ** 2 + (e.y - w.y) ** 2 < w.r * w.r) f *= w.slow;
+  for (const w of webs.values()) if (w.owner !== e.id && (isMob || !(e.bot && (players.get(w.owner) || {}).bot)) && (e.x - w.x) ** 2 + (e.y - w.y) ** 2 < w.r * w.r) f *= w.slow;
   return f;
 }
 
@@ -621,6 +621,7 @@ function movePet(m, def) {
   if (dist2(m, owner) < (range + 170) ** 2) {
     for (const p of players.values()) {
       if (p === owner || p.dead || !p.joined) continue;
+      if (owner.bot && (p.bot || owner.brain.foe !== p.id)) continue;   // a bot's pet only goes for the player it's fighting
       const d = dist2(p, owner); if (d < bd) { bd = d; tgt = p; }
     }
     if (!tgt) for (const w of nearMobs(owner.x, owner.y, range)) {
@@ -646,6 +647,7 @@ function petFights(now) {
     }
     for (const p of players.values()) {
       if (p === owner || p.dead || !p.joined || !mobs.has(m.id) || dist2(p, m) > (S.flower.radius + m.r) ** 2) continue;
+      if (owner && owner.bot && (p.bot || owner.brain.foe !== p.id)) continue;
       if (pairReady(`petf${m.id}_${p.id}`, now, 0.4)) { hurt(p, def.damage, owner, false); hurt(m, S.flower.bodyDamage, null, true); }
     }
   }
@@ -666,6 +668,7 @@ function tick() {
   const now = gameNow();
   const P = S.petals, F = S.flower;
   const live = [...players.values()].filter(p => p.joined && !p.dead);
+  bots.update(now, live);                         // bots decide what to press this tick
 
   // --- Flowers + their petals ---
   for (const p of live) {
@@ -682,7 +685,9 @@ function tick() {
     const z = zoneAt(p.x);
     p.overleveled = z.maxLevel !== null && p.level >= z.maxLevel;
     // Overleveled: petals keep working until the countdown finishes, then they disappear
-    p.olT = p.overleveled ? (p.olT || 0) + DT : 0;
+    // Overleveled timer: fills while you're too high a level for the zone; after you leave it
+    // drains back down at half the speed (20 s away takes 10 s off) instead of resetting at once
+    p.olT = p.overleveled ? (p.olT || 0) + DT : Math.max(0, (p.olT || 0) - DT * (F.overlevelDrain ?? 1));
     const olGone = p.overleveled && p.olT >= F.overlevelGrace;
 
     const target = p.input.attack ? P.attackRadius : p.input.defend ? P.defendRadius : P.orbitRadius;
@@ -710,10 +715,10 @@ function tick() {
     }
     p.maxHp = maxHpFor(p.level) + Math.round(hpBonus);
     if (p.hp > p.maxHp) p.hp = p.maxHp;
-    // Yin Yang: 1 reverses the spin, 2 stop it completely; an odd number spins backwards,
-    // an even number stops it, and all 8 make it spin forwards much faster
+    // Yin Yang (like the original): 1, 4 or 7 reverse the spin; 2 or 5 stop it; 0, 3 or 6 spin
+    // normally; all 8 spin forwards super fast
     const yy = p.petals.filter(s => s && PETALS[s.type].reverse).length;
-    const yyF = yy === 0 ? 1 : yy >= 8 ? P.yinYangAllSpeed : yy % 2 ? -1 : 0;
+    const yyF = yy >= 8 ? P.yinYangAllSpeed : [1, -1, 0][yy % 3];
     p.spin = (P.spinSpeed + spinBonus) / P.spinSpeed * p.honeyF * yyF;
     p.petalAngle = (p.petalAngle + P.spinSpeed * p.spin * DT) % TAU;
     ring.forEach(([type, q], i) => {
@@ -936,6 +941,7 @@ function tick() {
   // --- Flowers vs mobs (only mobs near each flower; big mobs are found by their edges) ---
   for (const p of live) for (const m of nearMobs(p.x, p.y, S.petals.attackRadius * 1.7 + 40)) {
     if (p.dead || !mobs.has(m.id) || m.owner === p.id) continue;
+    { const o = m.owner && players.get(m.owner); if (o && o.bot && (p.bot || o.brain.foe !== p.id)) continue; }   // a bot's pet only touches the player it's fighting
     const mdef = MOBS[m.type];
     for (let qi = 0; qi < p.ring.length; qi++) {
       const [type, q] = p.ring[qi];
@@ -972,10 +978,12 @@ function tick() {
     if (i === j) continue;
     const a = live[i], b = live[j];
     if (a.dead || b.dead) continue;
+    // Bots and players fight normally; bots just never hurt each other (for now)
+    const bothBots = a.bot && b.bot;
     a.ring.forEach(([type, q], qi) => {
       if (!q.alive) return;
       const def = PETALS[type];
-      if (dist2(q, b) < (def.radius + F.radius) ** 2 && pairReady(`f${a.id}_${qi}_${b.id}`, now, P.hitCooldown)) {
+      if (!bothBots && dist2(q, b) < (def.radius + F.radius) ** 2 && pairReady(`f${a.id}_${qi}_${b.id}`, now, P.hitCooldown)) {
         if (def.knockbackMul) {                          // Heaviest: knocks other flowers back too
           const d = Math.sqrt(dist2(q, b)) || 1, kb = S.mobs.knockback * def.knockbackMul;
           b.kx += (b.x - q.x) / d * kb; b.ky += (b.y - q.y) / d * kb;
@@ -985,7 +993,7 @@ function tick() {
         q.hp -= F.bodyDamage;
         if (q.hp <= 0) breakSub(type, q);
       }
-      if (i < j) b.ring.forEach(([t2, q2], qj) => {
+      if (i < j && !bothBots) b.ring.forEach(([t2, q2], qj) => {
         if (!q.alive || !q2.alive) return;
         const d2 = PETALS[t2];
         if (dist2(q, q2) < (def.radius + d2.radius) ** 2 && pairReady(`pp${a.id}_${qi}_${b.id}_${qj}`, now, P.hitCooldown)) {
@@ -1004,8 +1012,10 @@ function tick() {
           // Flowers get an extra-hard knock when they bump each other
           const kv = F.knockback * KB_DECAY * F.flowerBumpKnockback;
           a.kx = nx * kv; a.ky = ny * kv; b.kx = -nx * kv; b.ky = -ny * kv;
-          toxicTouch(a, b); toxicTouch(b, a);
-          hurt(b, flowerBodyDamage(a), a, false); hurt(a, flowerBodyDamage(b), b, false);
+          if (!bothBots) {
+            toxicTouch(a, b); hurt(b, flowerBodyDamage(a), a, false);
+            toxicTouch(b, a); hurt(a, flowerBodyDamage(b), b, false);
+          }
         }
       }
     }
@@ -1041,7 +1051,7 @@ function tick() {
 function sendState(now) {
   const plist = [...players.values()].filter(p => p.joined).map(p => ({
     id: p.id, n: p.name, x: Math.round(p.x), y: Math.round(p.y), hp: Math.round(p.hp * 10) / 10, mh: p.maxHp,
-    l: p.level, s: p.score, d: p.dead ? 1 : 0, f: p.fl === tickNo ? 1 : 0, m: p.input.attack ? 1 : p.input.defend ? 2 : 0,
+    l: p.level, s: p.score, d: p.dead ? 1 : 0, b: p.bot ? 1 : 0, f: p.fl === tickNo ? 1 : 0, m: p.input.attack ? 1 : p.input.defend ? 2 : 0,
     po: p.poison && !p.dead ? 1 : 0, pa: +p.petalAngle.toFixed(3), pr: Math.round(p.petalRadius), sp: +(p.spin ?? 1).toFixed(3), an: (p.vision || 1) > 1 ? 1 : 0,
     pt: p.dead || !p.ring ? [] : p.ring.map(([type, q]) => [type, q.alive ? 1 : 0, +q.rr.toFixed(3), q.uid, +(q.off || 0).toFixed(3), +(Math.max(0, q.hp) / PETALS[type].health).toFixed(2), q.ck]),
   }));
@@ -1124,11 +1134,15 @@ wss.on('connection', ws => {
   });
   ws.on('close', () => {
     players.delete(p.id);
-    if (paused && ![...players.values()].some(o => o.joined)) setPaused(false);   // everyone left: don't stay frozen
+    if (paused && ![...players.values()].some(o => o.joined && !o.bot)) setPaused(false);   // everyone left: don't stay frozen
   });
 });
 
 populate();
+// ---------- Bots ----------
+const bots = require('./bots.js')({ S, MOBS, PETALS, RANK, players, mobs, drops, projectiles, zoneBounds, MAP_W, MAP_H,
+  spawn, swapSlots, trashSlot, slotCount, zoneForLevel, gameNow, makeSlot, uniqueTaken, nextId: () => 1e6 + nextPlayerId++ });
+
 setInterval(populate, S.mobs.respawnInterval * 1000);
 setInterval(tick, 1000 / S.tickRate);
 server.listen(S.port, () => {

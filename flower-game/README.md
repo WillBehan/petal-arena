@@ -55,7 +55,7 @@ Quick-delete combos: `Q T T T` deletes three bench petals in a row, and `3 T` se
 ## Gameplay
 
 - **Zones:** Easy → Medium → Hard → ?, from left to right. Mobs get tougher and drops get rarer as you go. You spawn in the zone that fits your level.
-- **Overleveled:** at level 15 / 30 / 45 you're too high for Easy / Medium / Hard. A 45-second timer starts; when it fills, all your petals die. Move to a higher zone and they come back after 2.5 seconds.
+- **Overleveled:** at level 15 / 30 / 45 you're too high for Easy / Medium / Hard. A 45-second timer starts; when it fills, all your petals die. Move to a higher zone and they come back after 2.5 seconds. The timer drains back down after you leave at half the speed it filled (20 s away takes 10 s off), so popping back in doesn't start it from zero.
 - **Leveling:** XP comes from kills and from deleting petals (Common 2, Unusual 10, Rare 50, Epic 200, Legendary 1000, Unique 2500). The XP needed per level matches the original exactly (level 60 = 22,384 points). You get an extra petal slot at levels 15, 30 and 45.
 - **The curse:** from level 60, every mob on your screen comes after you.
 - **Fighting flowers:** killing a flower gives you half of their points. Body damage against other flowers is 0 until level 9 and builds up to the full 25 by level 14 (against mobs it's always 25). Flowers bounce off each other extra hard.
@@ -79,7 +79,18 @@ The title screen has **Mobs** and **Petals** tabs listing everything currently i
 Stats, drop chances, aggro ranges (12 units for Beetle, Hornet and Spider, 6 for Soldier Ants) and chase acceleration follow the Florr.io stat sheet. Ant Holes release 5 Baby Ants first, then a mix of 8 Worker and Soldier Ants, then only Soldier Ants (26 in all) as they take damage, plus a Queen Ant at 100 health. Now and then a Centipede or Evil Centipede spawns "massive", with 51 segments. Hornets shoot every 2 seconds; some shots lead your movement.
 
 ### Petal abilities
-Poison (Iris, Iris Missile, Epic/Legendary Peas, Epic Cactus), healing (Rose, Leaf), projectiles (Peas, Missile, Dandelion, Web), Pollen ground traps (left click throws them far, right click drops a clump), Yin Yang (1 reverses your spin, 2 stop it, all 8 spin much faster), Bubble launch (several bubbles add up), Wing swing, Honey slow (stacks), Salt damage reflect, Faster spin, Cactus max health, Egg pets (they go for flowers first), Web slow zones (overlapping webs multiply; Triple Web lands 3 webs side by side), Antennae extra vision, and multi-petals (Twin, Triplet, Pollen, triple Rose/Cactus/Stinger/Web).
+Poison (Iris, Iris Missile, Epic/Legendary Peas, Epic Cactus), healing (Rose, Leaf), projectiles (Peas, Missile, Dandelion, Web), Pollen ground traps (left click throws them far, right click drops a clump), Yin Yang (1, 4 or 7 reverse your spin; 2 or 5 stop it; 0, 3 or 6 spin normally; all 8 spin super fast), Bubble launch (several bubbles add up), Wing swing, Honey slow (stacks), Salt damage reflect, Faster spin, Cactus max health, Egg pets (they go for flowers first), Web slow zones (overlapping webs multiply; Triple Web lands 3 webs side by side), Antennae extra vision, and multi-petals (Twin, Triplet, Pollen, triple Rose/Cactus/Stinger/Web).
+
+### Bots
+Computer-controlled flowers (a blue dot with their name on the map) farm the world alongside you, following the same rules as players. Each bot:
+- picks a goal build from `config/builds.json` (the florr.io wiki's build tier list plus a few extra builds), starts with healing and Heavies, plays the "Killing Strat" (2 Roses, 3 Stingers, Iris) in Medium, and works towards its goal, using stand-in petals until it finds the real ones. Hard-to-get builds go through an easier stepping-stone build first (e.g. Wing Faster);
+- farms for points like a player: picks the mobs worth the most points per second (and those that drop what it's missing), circles them right at petal range with petals out, picks up everything and sells what it doesn't need straight away (never Legendaries or Uniques), plays farming builds like Twin Faster in between, clears out whatever chases it, and dodges Hornet missiles;
+- has its own skill level, from beginner to expert: reaction time, accuracy, dodging and how greedy it is all depend on it;
+- has its own aggression, from timid to aggressive (not tied to skill). It picks builds that match its temper: each build is tagged kill, leaning kill, hybrid, leaning farm or farm, and aggressive bots go for killing builds, calm ones for farming builds, the ones in between for hybrids. When you get close it sizes you up (its health and petals against yours): it only starts a fight when it's clearly stronger than you (a super aggressive bot will start one on worse odds), keeps away if it would likely lose, and otherwise leaves you alone. If you hit it, it fights back if the odds suit its temper (a timid bot only when it's very likely to win, an aggressive one even when it's unlikely) and runs otherwise. Staying alive comes first: when it's about to die it gets away from whatever is hurting it;
+- uses good petals it picks up even if its build doesn't call for them (an Epic Cactus takes a Twin's place in Twin Faster, and it builds around it);
+- never fights other bots (yet). Bots still race everyone to drops.
+
+Change how many bots there are with `"bots": { "count": 6 }` in `config/settings.json`.
 
 ---
 
@@ -92,6 +103,7 @@ Most of the game is plain JSON in the `config/` folder, so you can change it wit
 | `config/settings.json` | Flower speed and health, map and zone sizes, XP multiplier, petal orbit, mob behavior, drop timers, zoom |
 | `config/mobs.json` | Every mob: health, damage, XP, size, speed, aggro range, chase acceleration, which zones it spawns in (min–max counts) and its drop table |
 | `config/petals.json` | Every petal: rarity, damage, health, reload, color and special ability |
+| `config/builds.json` | The builds bots aim for, petal families and stand-ins, and stepping-stone builds |
 
 **Example: add a custom petal.** Add an entry to `petals.json`:
 ```json
@@ -111,6 +123,7 @@ Then make a mob drop it, for example in `mobs.json` under `"bee"` → `"drops"`,
 ```
 flower-game/
 ├── server.js            # Game server: world simulation, mobs, combat, multiplayer
+├── bots.js              # Bot brains: builds, farming, fighting, healing
 ├── public/
 │   ├── index.html       # Title screen, custom start menu
 │   ├── client.js        # Rendering, animation, controls, inventory UI
@@ -133,7 +146,7 @@ flower-game/
 - [x] Easy, Medium and Hard zones
 - [x] "?" zone (Dark Ladybug, Yin Yang)
 - [ ] Saved progress between sessions
-- [ ] Bots
+- [x] Bots (first version)
 - [ ] Online hosting so friends can join from anywhere
 
 ---

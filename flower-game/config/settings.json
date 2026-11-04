@@ -61,7 +61,8 @@
     ],
     "flowerBumpKnockback": 2,
     "uniqueBasicChance": 0.001,
-    "spawnClearance": 150
+    "spawnClearance": 150,
+    "overlevelDrain": 0.5
   },
   "petals": {
     "orbitRadius": 65,
@@ -264,5 +265,8 @@
   "client": {
     "zoom": 0.773
   },
-  "poisonPerSecond": 9
+  "poisonPerSecond": 9,
+  "bots": {
+    "count": 10
+  }
 }

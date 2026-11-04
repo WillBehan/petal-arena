@@ -353,8 +353,8 @@
     "reload": 1,
     "radius": 10,
     "trashXp": 200,
-    "color": "#5fbf5f",
-    "outline": "#3f913f",
+    "color": "#a35fd6",
+    "outline": "#7a3fae",
     "shape": "cactus",
     "hpBonus": 20,
     "poison": [
@@ -371,14 +371,14 @@
     "rarity": "legendary",
     "damage": 1,
     "health": 50,
-    "reload": 1,
+    "reload": 1.5,
     "radius": 14,
     "trashXp": 1000,
     "color": "#fff0c4",
     "outline": "#d6c491",
     "shape": "egg",
     "pet": "beetle",
-    "hatch": 2,
+    "hatch": 1,
     "petRange": 700
   },
   "cactusLegendary": {

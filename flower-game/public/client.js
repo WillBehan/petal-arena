@@ -76,6 +76,7 @@ function updateSpawnInfo() {
   } else if (homeAfterDeath && homeAfterDeath.level) {
     level = homeAfterDeath.level; const n = homeAfterDeath.slots;
     load = homeAfterDeath.keep.slice(0, n); bench = homeAfterDeath.keep.slice(n);
+    while (load.length < n) load.push('basic');                      // empty slots get a Basic
   } else { el.classList.add('hidden'); return; }
   el.classList.remove('hidden');
   const h = document.createElement('div'); h.textContent = `You will ${homeAfterDeath ? 're' : ''}spawn at level ${level} with:`; el.appendChild(h);
@@ -703,6 +704,20 @@ function drawHUD(W, H, me, self) {
   label('Map', mmx + mw / 2, mmy - 8, 16, 'center');
   if (self) { ctx.fillStyle = '#ffd34a'; ctx.strokeStyle = '#333'; ctx.lineWidth = 2;
     ctx.beginPath(); ctx.arc(mmx + view[self.id].x / MAP.w * mw, mmy + mh / 2, 6, 0, TAU); ctx.fill(); ctx.stroke(); }
+  // Bots: small blue dots with a white ring (on top of yours), names under the map where
+  // they fit. Gone while they're dead; back where they respawn.
+  const nameSpots = [];
+  for (const p of state.players) {
+    if (!p.b || p.d) continue;
+    const bx = mmx + p.x / MAP.w * mw, by = mmy + Math.min(mh - 3, Math.max(3, p.y / MAP.h * mh));
+    ctx.fillStyle = '#2f9bff'; ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.arc(bx, by, 3.5, 0, TAU); ctx.fill(); ctx.stroke();
+    const lx = Math.min(Math.max(bx, mmx + 30), mmx + mw - 30), half = p.n.length * 2.6;
+    if (!nameSpots.some(([a, b]) => lx + half > a && lx - half < b)) {   // skip names that would overlap
+      nameSpots.push([lx - half, lx + half]);
+      label(p.n, lx, mmy + mh + 11, 9, 'center', '#cfe9ff');
+    }
+  }
   drawInventory(W, H, me);
 }
 
